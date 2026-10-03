@@ -8,8 +8,15 @@ import { createHash } from 'node:crypto';
 const url = (p) => new URL(p, import.meta.url);
 const read = (p) => readFileSync(url(p), 'utf8');
 
+// Versión: huella de las fuentes; se muestra en Reglas → Mantenimiento y nombra la caché.
+const version = createHash('sha256')
+  .update(['template.html', 'styles.css', 'engine.js', 'app.js', 'sw.js', 'vendor/peerjs.min.js'].map((f) => read('./src/' + f)).join('\n'))
+  .digest('hex')
+  .slice(0, 8);
+
 function page({ head = '', vendor = '' } = {}) {
   return read('./src/template.html')
+    .replace('__APP_VERSION__', version)
     .replace('<!--__HEAD__-->', () => head)
     .replace('<!--__VENDOR__-->', () => vendor)
     .replace('/*__CSS__*/', () => read('./src/styles.css'))
@@ -51,7 +58,6 @@ const pwaHead = `<meta name="description" content="Practica blackjack: estrategi
 <meta name="apple-mobile-web-app-title" content="Seis Mazos">
 <script>window.SEIS_MAZOS_PWA = true;</script>`;
 const appHtml = doc(page({ head: pwaHead, vendor: '<script src="peerjs.min.js"></script>' }));
-const version = createHash('sha256').update(appHtml).update(read('./src/vendor/peerjs.min.js')).digest('hex').slice(0, 10);
 rmSync(url('./app/'), { recursive: true, force: true });
 mkdirSync(url('./app/icons/'), { recursive: true });
 writeFileSync(url('./app/index.html'), appHtml);
