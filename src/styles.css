@@ -1235,6 +1235,10 @@ td .ix {
 table.chart.no-ix .ix {
   display: none;
 }
+td.h17diff {
+  outline: 2px dashed var(--ink);
+  outline-offset: -3px;
+}
 td.hl {
   outline: 3px solid var(--ink);
   outline-offset: -1px;
@@ -1526,6 +1530,28 @@ table.score tr.total td {
   .hand-meta {
     flex-direction: column;
     gap: 3px;
+  }
+  .charts .panel {
+    padding: 12px 10px;
+  }
+  table.chart {
+    border-spacing: 1px;
+    font-size: 0.72rem;
+  }
+  table.chart td {
+    min-width: 0;
+    padding: 5px 0;
+  }
+  table.chart th {
+    padding: 2px 3px;
+    font-size: 0.68rem;
+  }
+  table.chart tbody th {
+    padding-right: 4px;
+  }
+  td .ix {
+    font-size: 0.5rem;
+    right: 1px;
   }
   .hand-meta .pill {
     font-size: 0.68rem;

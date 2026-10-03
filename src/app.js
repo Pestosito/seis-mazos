@@ -1776,7 +1776,12 @@
           row.cells.map((c) =>
             h(
               'td',
-              { class: `c-${c.code}${hl && hl.key === row.key && hl.up === c.up ? ' hl' : ''}`, title: CODE_TITLE[c.code] },
+              {
+                class: `c-${c.code}${hl && hl.key === row.key && hl.up === c.up ? ' hl' : ''}${
+                  opts && opts.marks && opts.marks.has(`${opts.kind}:${row.key}:${c.up}`) ? ' h17diff' : ''
+                }`,
+                title: CODE_TITLE[c.code],
+              },
               CODE_LABEL[c.code],
               c.devs && c.devs.length
                 ? h('span', { class: 'ix' }, c.devs.map((d) => (d.kind === 'sur' ? 'R' : '') + signed(d.index)).join(' '))
@@ -2351,11 +2356,29 @@
       ...legendItems.map(([c, t]) => h('span', null, h('i', { class: 'c-' + c, style: `background:var(--a-${actionVar(c)})` }, CODE_LABEL[c]), t)),
       noIx ? null : h('span', null, h('i', { style: 'background:var(--panel-2);color:var(--ink)' }, '+4'), 'índice de desviación (R = rendirse)'),
     );
-    const block = (title, rows, corner) =>
-      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(rows, { noIx, corner })));
+    // Casillas que cambian según el crupier pida o se plante con 17 blando.
+    const other = BJ.strategyCharts(Object.assign({}, r, { h17: !r.h17 }));
+    const marks = new Set();
+    const changes = [];
+    for (const kind of ['hard', 'soft', 'pairs'])
+      charts[kind].forEach((row, i) =>
+        row.cells.forEach((c, j) => {
+          const alt = other[kind][i].cells[j].code;
+          if (alt === c.code) return;
+          marks.add(`${kind}:${row.key}:${c.up}`);
+          const s17 = r.h17 ? alt : c.code;
+          const h17 = r.h17 ? c.code : alt;
+          changes.push(`${row.label} vs ${BJ.upLabel(c.up)}: ${CODE_TITLE[s17].split(' (')[0]} → ${CODE_TITLE[h17].split(' (')[0]}`);
+        }),
+      );
+    $('tb-h17').textContent = r.h17
+      ? `El crupier pide con 17 blando (H17). Las casillas marcadas cambian respecto a S17: ${changes.join(' · ')}.`
+      : `El crupier se planta con 17 blando (S17). Las casillas marcadas cambiarían con H17: ${changes.join(' · ')}.`;
+    const block = (title, kind, corner) =>
+      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })));
     $('tb-charts').replaceChildren(
-      block('Manos duras', charts.hard, 'Total'),
-      h('div', { class: 'side' }, block('Manos blandas', charts.soft, 'Mano'), block('Parejas', charts.pairs, 'Pareja')),
+      block('Manos duras', 'hard', 'Total'),
+      h('div', { class: 'side' }, block('Manos blandas', 'soft', 'Mano'), block('Parejas', 'pairs', 'Pareja')),
     );
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
