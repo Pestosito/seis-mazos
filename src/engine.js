@@ -27,6 +27,9 @@
     hitSplitAces: false,
     doubleOn: 'any', // 'any' | '9-11' | '10-11'
     surrender: 'late', // 'none' | 'late'
+    // Con H17, rendirse también con 15 y 17 contra As y con 8,8 contra As (tablas de Wizard of Odds).
+    // La tabla H17 de Blackjack Apprenticeship no las incluye, así que por defecto están desactivadas.
+    h17ExtraSurrender: false,
     bjPays: 1.5, // 1.5 = 3:2, 1.2 = 6:5
     penetration: 0.75,
   };
@@ -208,16 +211,21 @@
 
   // Códigos: H pedir, S plantarse, D doblar (si no, pedir), Ds doblar (si no, plantarse),
   // Rh rendirse (si no, pedir), Rs rendirse (si no, plantarse).
+  function extraH17Surrender(r) {
+    return r.surrender === 'late' && r.h17 && !!r.h17ExtraSurrender;
+  }
+
   function hardCode(total, up, r) {
     const sur = r.surrender === 'late';
+    const extra = extraH17Surrender(r);
     if (total >= 18) return 'S';
-    if (total === 17) return sur && r.h17 && up === 11 ? 'Rs' : 'S';
+    if (total === 17) return extra && up === 11 ? 'Rs' : 'S';
     if (total === 16) {
       if (sur && up >= 9) return 'Rh';
       return up <= 6 ? 'S' : 'H';
     }
     if (total === 15) {
-      if (sur && (up === 10 || (r.h17 && up === 11))) return 'Rh';
+      if (sur && (up === 10 || (extra && up === 11))) return 'Rh';
       return up <= 6 ? 'S' : 'H';
     }
     if (total === 13 || total === 14) return up <= 6 ? 'S' : 'H';
@@ -253,7 +261,7 @@
       case 9:
         return up <= 9 && up !== 7 ? 'P' : null;
       case 8:
-        return r.surrender === 'late' && r.h17 && up === 11 ? 'Rp' : 'P';
+        return extraH17Surrender(r) && up === 11 ? 'Rp' : 'P';
       case 7:
         return up <= 7 ? 'P' : null;
       case 6:
@@ -341,7 +349,7 @@
       { id: 'R14v10', kind: 'sur', total: 14, up: 10, index: 3, above: 'R', group: 'Fab4' },
       { id: 'R15v10', kind: 'sur', total: 15, up: 10, index: 0, above: 'R', group: 'Fab4' },
       { id: 'R15v9', kind: 'sur', total: 15, up: 9, index: 2, above: 'R', group: 'Fab4' },
-      { id: 'R15vA', kind: 'sur', total: 15, up: 11, index: r.h17 ? -1 : 1, above: 'R', group: 'Fab4' },
+      { id: 'R15vA', kind: 'sur', total: 15, up: 11, index: extraH17Surrender(r) ? -1 : 1, above: 'R', group: 'Fab4' },
     ];
     return list.filter((d) => {
       if (d.s17only && r.h17) return false;
@@ -479,35 +487,35 @@
     }
   }
 
+  // Tablas para mostrar, con el mismo formato que las de Blackjack Apprenticeship: filas de mayor a
+  // menor, y la rendición en un cuadro aparte (en las demás tablas se ve la jugada sin rendirse).
   function strategyCharts(r) {
-    const hardRows = [
-      { label: '5–8', total: 8 },
-      { label: '9', total: 9 },
-      { label: '10', total: 10 },
-      { label: '11', total: 11 },
-      { label: '12', total: 12 },
-      { label: '13', total: 13 },
-      { label: '14', total: 14 },
-      { label: '15', total: 15 },
-      { label: '16', total: 16 },
-      { label: '17', total: 17 },
-      { label: '18+', total: 18 },
-    ];
+    const sur = r.surrender === 'late';
+    const noSur = (code) => (code === 'Rh' ? 'H' : code === 'Rs' ? 'S' : code === 'Rp' ? 'P' : code);
     const devs = deviationList(r);
     const devAt = (pred) => devs.filter(pred);
+    const hardRows = [
+      { label: '17+', total: 17 },
+      { label: '16', total: 16 },
+      { label: '15', total: 15 },
+      { label: '14', total: 14 },
+      { label: '13', total: 13 },
+      { label: '12', total: 12 },
+      { label: '11', total: 11 },
+      { label: '10', total: 10 },
+      { label: '9', total: 9 },
+      { label: '5–8', total: 8 },
+    ];
     const hard = hardRows.map((row) => ({
       label: row.label,
       key: row.total,
       cells: UPCARDS.map((up) => ({
         up,
-        code: displayCode(hardCode(row.total, up, r), canDoubleHardTotal(row.total, r), r),
-        devs:
-          row.total >= 9 && row.total <= 17
-            ? devAt((d) => (d.kind === 'hard' || d.kind === 'sur') && d.total === row.total && d.up === up)
-            : [],
+        code: displayCode(noSur(hardCode(row.total, up, r)), canDoubleHardTotal(row.total, r), r),
+        devs: devAt((d) => d.kind === 'hard' && d.total === row.total && d.up === up),
       })),
     }));
-    const soft = [2, 3, 4, 5, 6, 7, 8, 9].map((x) => ({
+    const soft = [9, 8, 7, 6, 5, 4, 3, 2].map((x) => ({
       label: `A,${x}`,
       key: 11 + x,
       cells: UPCARDS.map((up) => ({
@@ -516,20 +524,34 @@
         devs: [],
       })),
     }));
-    const pairs = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((pv) => ({
+    const pairs = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2].map((pv) => ({
       label: pv === 11 ? 'A,A' : pv === 10 ? '10,10' : `${pv},${pv}`,
       key: pv,
       cells: UPCARDS.map((up) => {
         const pc = pairCode(pv, up, r);
         let code;
-        if (pc === 'P' || (pc === 'Ph' && r.das)) code = 'P';
-        else if (pc === 'Rp') code = displayCode('Rp', true, r);
-        else code = displayCode(hardCode(pv * 2, up, r), canDoubleHardTotal(pv * 2, r), r);
+        if (pc === 'P' || pc === 'Rp' || (pc === 'Ph' && r.das)) code = 'P';
+        else code = displayCode(noSur(hardCode(pv * 2, up, r)), canDoubleHardTotal(pv * 2, r), r);
         const devs = pv === 10 ? devAt((d) => d.kind === 'pair' && d.up === up) : [];
         return { up, code, devs };
       }),
     }));
-    return { hard, soft, pairs };
+    const surrender = [];
+    if (sur) {
+      const isR = (c) => c === 'Rh' || c === 'Rs';
+      for (const total of [17, 16, 15, 14]) {
+        const cells = UPCARDS.map((up) => ({
+          up,
+          code: isR(hardCode(total, up, r)) ? 'R' : '',
+          devs: devAt((d) => d.kind === 'sur' && d.total === total && d.up === up),
+        }));
+        if (total === 17 && !cells.some((c) => c.code)) continue;
+        surrender.push({ label: String(total), key: total, cells });
+      }
+      const p8 = UPCARDS.map((up) => ({ up, code: pairCode(8, up, r) === 'Rp' ? 'R' : '', devs: [] }));
+      if (p8.some((c) => c.code)) surrender.push({ label: '8,8', key: 'p8', cells: p8 });
+    }
+    return { hard, soft, pairs, surrender };
   }
 
   /* ---------- Ventaja de la casa aproximada ---------- */

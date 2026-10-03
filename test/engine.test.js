@@ -78,14 +78,91 @@ test('estrategia básica: casos de referencia 6 mazos S17 DAS LS', () => {
 
 test('estrategia básica: cambios con H17', () => {
   const r = R({ h17: true });
-  const a = (cards, up, avail = FULL) => BJ.basicDecision(hand(...cards), up, avail, r).action;
+  const a = (cards, up, avail = FULL, rules = r) => BJ.basicDecision(hand(...cards), up, avail, rules).action;
   assert.equal(a(['8', '3'], 11), 'D');
   assert.equal(a(['A', '8'], 6), 'D');
   assert.equal(a(['A', '7'], 2), 'D');
-  assert.equal(a(['10', '5'], 11), 'R');
-  assert.equal(a(['10', '7'], 11), 'R');
-  assert.equal(a(['8', '8'], 11), 'R');
-  assert.equal(a(['8', '8'], 11, NO_SUR), 'P');
+  // Como la tabla H17 de Blackjack Apprenticeship: sin rendiciones extra contra As
+  assert.equal(a(['10', '5'], 11), 'H');
+  assert.equal(a(['10', '7'], 11), 'S');
+  assert.equal(a(['8', '8'], 11), 'P');
+  // Con la opción de rendiciones extra (tablas de Wizard of Odds)
+  const x = R({ h17: true, h17ExtraSurrender: true });
+  assert.equal(a(['10', '5'], 11, FULL, x), 'R');
+  assert.equal(a(['10', '7'], 11, FULL, x), 'R');
+  assert.equal(a(['8', '8'], 11, FULL, x), 'R');
+  assert.equal(a(['8', '8'], 11, NO_SUR, x), 'P');
+});
+
+/*
+ * Tabla H17 de Blackjack Apprenticeship (4–8 mazos, DAS, rendición tardía), transcrita casilla
+ * por casilla. Columnas: 2 3 4 5 6 7 8 9 10 A. En parejas, "y" significa separar solo con DAS.
+ */
+const BJA_H17 = {
+  pairs: {
+    11: 'YYYYYYYYYY',
+    10: 'NNNNNNNNNN',
+    9: 'YYYYYNYYNN',
+    8: 'YYYYYYYYYY',
+    7: 'YYYYYYNNNN',
+    6: 'yYYYYNNNNN',
+    5: 'NNNNNNNNNN',
+    4: 'NNNyyNNNNN',
+    3: 'yyYYYYNNNN',
+    2: 'yyYYYYNNNN',
+  },
+  soft: {
+    20: ['S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+    19: ['S', 'S', 'S', 'S', 'Ds', 'S', 'S', 'S', 'S', 'S'],
+    18: ['Ds', 'Ds', 'Ds', 'Ds', 'Ds', 'S', 'S', 'H', 'H', 'H'],
+    17: ['H', 'D', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+    16: ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+    15: ['H', 'H', 'D', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+    14: ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+    13: ['H', 'H', 'H', 'D', 'D', 'H', 'H', 'H', 'H', 'H'],
+  },
+  hard: {
+    17: 'SSSSSSSSSS',
+    16: 'SSSSSHHHHH',
+    15: 'SSSSSHHHHH',
+    14: 'SSSSSHHHHH',
+    13: 'SSSSSHHHHH',
+    12: 'HHSSSHHHHH',
+    11: 'DDDDDDDDDD',
+    10: 'DDDDDDDDHH',
+    9: 'HDDDDHHHHH',
+    8: 'HHHHHHHHHH',
+  },
+  surrender: { 16: '.......RRR', 15: '........R.', 14: '..........' },
+};
+const cellsOf = (row) => row.cells.map((c) => c.code);
+
+function checkAgainstBJA(rules, expected) {
+  const ch = BJ.strategyCharts(rules);
+  for (const row of ch.hard) assert.deepEqual(cellsOf(row).join(''), expected.hard[row.key], `duro ${row.label}`);
+  for (const row of ch.soft) assert.deepEqual(cellsOf(row), expected.soft[row.key], `blando ${row.label}`);
+  for (const row of ch.pairs) {
+    const want = [...expected.pairs[row.key]].map((ch) => (ch === 'Y' || (ch === 'y' && rules.das) ? 'P' : 'no'));
+    const got = cellsOf(row).map((c) => (c === 'P' ? 'P' : 'no'));
+    assert.deepEqual(got, want, `pareja ${row.label}`);
+  }
+  assert.deepEqual(
+    Object.fromEntries(ch.surrender.map((row) => [row.key, row.cells.map((c) => c.code || '.').join('')])),
+    expected.surrender,
+  );
+}
+
+test('tablas idénticas a la tabla H17 de Blackjack Apprenticeship', () => {
+  checkAgainstBJA(R({ h17: true }), BJA_H17);
+  checkAgainstBJA(R({ h17: true, das: false }), BJA_H17);
+});
+
+test('con S17 solo cambian 11 vs A, A,7 vs 2 y A,8 vs 6', () => {
+  const s17 = JSON.parse(JSON.stringify(BJA_H17));
+  s17.hard[11] = 'DDDDDDDDDH';
+  s17.soft[19][4] = 'S';
+  s17.soft[18][0] = 'S';
+  checkAgainstBJA(R(), s17);
 });
 
 test('estrategia básica: sin DAS', () => {
@@ -155,8 +232,12 @@ test('desviaciones con H17', () => {
   const ids = BJ.deviationList(r).map((x) => x.id);
   assert.ok(!ids.includes('11vA'));
   assert.equal(BJ.deviationList(r).find((x) => x.id === '10vA').index, 3);
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, -1.5, true).action, 'H');
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, -1, true).action, 'R');
+  // Sin rendiciones extra, 15 vs A se rinde con el índice de S17 (+1)
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, 0.5, true).action, 'H');
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, 1, true).action, 'R');
+  const x = R({ h17: true, h17ExtraSurrender: true });
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, x, -1.5, true).action, 'H');
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, x, -1, true).action, 'R');
 });
 
 test('corrección con tolerancia por estimación de mazos', () => {
@@ -352,7 +433,7 @@ const KNOWN = new Set(['soft A,4 v 4: tabla D, EV H', 'soft A,2 v 5: tabla D, EV
 
 for (const [name, rules] of [
   ['S17 DAS LS', R()],
-  ['H17 DAS LS', R({ h17: true })],
+  ['H17 DAS LS (rendiciones extra)', R({ h17: true, h17ExtraSurrender: true })],
   ['S17 noDAS sin rendición', R({ das: false, surrender: 'none' })],
   ['H17 noDAS sin rendición', R({ h17: true, das: false, surrender: 'none' })],
 ]) {

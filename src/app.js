@@ -8,7 +8,7 @@
   const AVAIL_KEY = { H: 'hit', S: 'stand', D: 'double', P: 'split', R: 'surrender' };
   const SPEEDS = { slow: 650, normal: 380, fast: 190, instant: 0 };
   const BOT_NAMES = ['Marta', 'Joel', 'Inés', 'Raúl'];
-  const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', Rh: 'R', Rs: 'Rs', Rp: 'Rp' };
+  const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -685,12 +685,13 @@
     );
   }
 
+  const extraSur = (r) => r.h17 && r.surrender === 'late' && r.h17ExtraSurrender;
   function rulesSummary(r) {
     return [
       `${r.decks} mazos`,
       r.h17 ? 'H17' : 'S17',
       r.das ? 'DAS' : 'sin DAS',
-      r.surrender === 'late' ? 'rendición' : 'sin rendición',
+      r.surrender === 'late' ? (extraSur(r) ? 'rendición (+ extras H17)' : 'rendición') : 'sin rendición',
       `separar hasta ${r.maxHands}`,
       r.resplitAces ? 'RSA' : 'sin RSA',
       r.doubleOn === 'any' ? 'doblar 2 cartas' : `doblar ${r.doubleOn}`,
@@ -1795,6 +1796,8 @@
   }
 
   const CODE_TITLE = {
+    R: 'Rendirse',
+    '': '',
     H: 'Pedir',
     S: 'Plantarse',
     D: 'Doblar (si no se puede, pedir)',
@@ -1805,14 +1808,12 @@
     Rp: 'Rendirse (si no se puede, separar)',
   };
 
+  const CHART_TITLE = { pairs: 'Parejas', soft: 'Manos blandas', hard: 'Manos duras', surrender: 'Rendición tardía' };
   function chartFor(kind, r) {
-    const charts = BJ.strategyCharts(r);
-    if (kind === 'hard') return { title: 'Manos duras', rows: charts.hard };
-    if (kind === 'soft') return { title: 'Manos blandas', rows: charts.soft };
-    return { title: 'Parejas', rows: charts.pairs };
+    return { title: CHART_TITLE[kind], rows: BJ.strategyCharts(r)[kind] };
   }
   function chartKey(kind, row) {
-    if (kind === 'hard') return row <= 8 ? 8 : row >= 18 ? 18 : row;
+    if (kind === 'hard') return row <= 8 ? 8 : row >= 17 ? 17 : row;
     return row;
   }
 
@@ -1896,9 +1897,13 @@
         ok && $('sd-auto').checked ? 'Siguiente en un momento…' : 'Pulsa <b>Enter</b> o el botón para la siguiente.',
       ],
     );
-    const kind = d.kind === 'pair' || BJ.isPair(c.cards) ? 'pair' : d.kind;
+    // La casilla a resaltar: la rendición tiene su propio cuadro, como en Blackjack Apprenticeship.
+    const pair = BJ.isPair(c.cards);
+    const kind = d.action === 'R' ? 'surrender' : pair ? 'pairs' : d.kind;
     const ch = chartFor(kind, r);
-    const row = kind === 'pair' ? (c.cards[0].v === 1 ? 11 : c.cards[0].v) : chartKey(kind, BJ.handValue(c.cards).total);
+    const total = BJ.handValue(c.cards).total;
+    const row =
+      kind === 'surrender' ? (d.code === 'Rp' ? 'p8' : total) : kind === 'pairs' ? (c.cards[0].v === 1 ? 11 : c.cards[0].v) : chartKey(kind, total);
     $('sd-chart-title').textContent = ch.title;
     $('sd-chart').replaceChildren(chartTable(ch.rows, { hl: { key: row, up: c.upV }, noIx: true }));
     const next = h('button', { class: 'btn primary', type: 'button', onclick: sdNext }, 'Siguiente', h('kbd', null, '↵'));
@@ -2349,8 +2354,7 @@
       ['Ds', 'Doblar; si no se puede, plantarse'],
       ['P', 'Separar'],
     ];
-    if (r.surrender === 'late')
-      legendItems.push(['Rh', 'Rendirse; si no se puede, pedir'], ['Rs', 'Rendirse; si no, plantarse'], ['Rp', 'Rendirse; si no, separar']);
+    if (r.surrender === 'late') legendItems.push(['R', 'Rendirse (cuadro de rendición)']);
     fill(
       $('tb-legend'),
       ...legendItems.map(([c, t]) => h('span', null, h('i', { class: 'c-' + c, style: `background:var(--a-${actionVar(c)})` }, CODE_LABEL[c]), t)),
@@ -2360,25 +2364,55 @@
     const other = BJ.strategyCharts(Object.assign({}, r, { h17: !r.h17 }));
     const marks = new Set();
     const changes = [];
-    for (const kind of ['hard', 'soft', 'pairs'])
-      charts[kind].forEach((row, i) =>
-        row.cells.forEach((c, j) => {
-          const alt = other[kind][i].cells[j].code;
-          if (alt === c.code) return;
-          marks.add(`${kind}:${row.key}:${c.up}`);
-          const s17 = r.h17 ? alt : c.code;
-          const h17 = r.h17 ? c.code : alt;
-          changes.push(`${row.label} vs ${BJ.upLabel(c.up)}: ${CODE_TITLE[s17].split(' (')[0]} → ${CODE_TITLE[h17].split(' (')[0]}`);
-        }),
-      );
+    const KINDS = ['pairs', 'soft', 'hard', 'surrender'];
+    const word = (code) => (code ? CODE_TITLE[code].split(' (')[0] : 'no rendirse');
+    for (const kind of KINDS) {
+      const keys = new Set([...charts[kind], ...other[kind]].map((row) => row.key));
+      for (const key of keys) {
+        const mine = charts[kind].find((row) => row.key === key);
+        const alt = other[kind].find((row) => row.key === key);
+        for (const up of BJ.UPCARDS) {
+          const a = mine ? mine.cells.find((c) => c.up === up).code : '';
+          const b = alt ? alt.cells.find((c) => c.up === up).code : '';
+          if (a === b) continue;
+          if (mine) marks.add(`${kind}:${key}:${up}`);
+          const label = (mine || alt).label;
+          const s17 = r.h17 ? b : a;
+          const h17 = r.h17 ? a : b;
+          changes.push(`${kind === 'surrender' ? 'Rendición ' : ''}${label} vs ${BJ.upLabel(up)}: ${word(s17)} → ${word(h17)}`);
+        }
+      }
+    }
     $('tb-h17').textContent = r.h17
       ? `El crupier pide con 17 blando (H17). Las casillas marcadas cambian respecto a S17: ${changes.join(' · ')}.`
       : `El crupier se planta con 17 blando (S17). Las casillas marcadas cambiarían con H17: ${changes.join(' · ')}.`;
-    const block = (title, kind, corner) =>
-      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })));
-    $('tb-charts').replaceChildren(
-      block('Manos duras', 'hard', 'Total'),
-      h('div', { class: 'side' }, block('Manos blandas', 'soft', 'Mano'), block('Parejas', 'pairs', 'Pareja')),
+    const block = (kind, corner) =>
+      h(
+        'div',
+        { class: 'panel' },
+        h('h3', null, CHART_TITLE[kind]),
+        h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })),
+      );
+    fill(
+      $('tb-charts'),
+      block('pairs', 'Pareja'),
+      block('soft', 'Mano'),
+      block('hard', 'Total'),
+      charts.surrender.length
+        ? h(
+            'div',
+            { class: 'panel' },
+            h('h3', null, CHART_TITLE.surrender),
+            h('div', { class: 'chart-wrap' }, chartTable(charts.surrender, { noIx, corner: 'Total', marks, kind: 'surrender' })),
+            h('p', { class: 'small muted' }, 'Solo con las dos primeras cartas. Si no se puede rendir, se juega lo que dicen las otras tablas.'),
+          )
+        : null,
+      h(
+        'div',
+        { class: 'panel' },
+        h('h3', null, 'Seguro y pago igual'),
+        h('p', null, h('b', null, 'No tomarlos.'), settings.training.useDeviations ? ' Si cuentas cartas: tómalos solo con true count +3 o más.' : ''),
+      ),
     );
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
@@ -2449,6 +2483,12 @@
     { key: 'hitSplitAces', label: 'Pedir con ases separados', hint: 'Lo normal es una sola carta por as.', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'doubleOn', label: 'Doblar con', options: [['any', 'Dos cartas cualesquiera'], ['9-11', '9, 10, 11'], ['10-11', '10 y 11']] },
     { key: 'surrender', label: 'Rendición', hint: 'Tardía: después de que el crupier revisa si tiene blackjack.', options: [['late', 'Tardía'], ['none', 'No']] },
+    {
+      key: 'h17ExtraSurrender',
+      label: 'Con H17, rendirse también con 15 y 17 vs A y 8,8 vs A',
+      hint: 'La tabla de Blackjack Apprenticeship no las incluye. Según Wizard of Odds son un poco mejores.',
+      options: [[false, 'No'], [true, 'Sí']],
+    },
     { key: 'bjPays', label: 'Blackjack paga', options: [[1.5, '3 a 2'], [1.2, '6 a 5']] },
     {
       key: 'penetration',

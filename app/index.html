@@ -1238,10 +1238,14 @@ td.c-Ds {
 td.c-P {
   background: var(--a-p);
 }
+td.c-R,
 td.c-Rh,
 td.c-Rs,
 td.c-Rp {
   background: var(--a-r);
+}
+td.c- {
+  background: var(--panel-2);
 }
 td .ix {
   position: absolute;
@@ -1842,7 +1846,7 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">c19cb6b1</span></p>
+            <p class="small muted">Versión <span class="num">9cbbfe34</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
@@ -1887,6 +1891,9 @@ table.score tr.total td {
     hitSplitAces: false,
     doubleOn: 'any', // 'any' | '9-11' | '10-11'
     surrender: 'late', // 'none' | 'late'
+    // Con H17, rendirse también con 15 y 17 contra As y con 8,8 contra As (tablas de Wizard of Odds).
+    // La tabla H17 de Blackjack Apprenticeship no las incluye, así que por defecto están desactivadas.
+    h17ExtraSurrender: false,
     bjPays: 1.5, // 1.5 = 3:2, 1.2 = 6:5
     penetration: 0.75,
   };
@@ -2068,16 +2075,21 @@ table.score tr.total td {
 
   // Códigos: H pedir, S plantarse, D doblar (si no, pedir), Ds doblar (si no, plantarse),
   // Rh rendirse (si no, pedir), Rs rendirse (si no, plantarse).
+  function extraH17Surrender(r) {
+    return r.surrender === 'late' && r.h17 && !!r.h17ExtraSurrender;
+  }
+
   function hardCode(total, up, r) {
     const sur = r.surrender === 'late';
+    const extra = extraH17Surrender(r);
     if (total >= 18) return 'S';
-    if (total === 17) return sur && r.h17 && up === 11 ? 'Rs' : 'S';
+    if (total === 17) return extra && up === 11 ? 'Rs' : 'S';
     if (total === 16) {
       if (sur && up >= 9) return 'Rh';
       return up <= 6 ? 'S' : 'H';
     }
     if (total === 15) {
-      if (sur && (up === 10 || (r.h17 && up === 11))) return 'Rh';
+      if (sur && (up === 10 || (extra && up === 11))) return 'Rh';
       return up <= 6 ? 'S' : 'H';
     }
     if (total === 13 || total === 14) return up <= 6 ? 'S' : 'H';
@@ -2113,7 +2125,7 @@ table.score tr.total td {
       case 9:
         return up <= 9 && up !== 7 ? 'P' : null;
       case 8:
-        return r.surrender === 'late' && r.h17 && up === 11 ? 'Rp' : 'P';
+        return extraH17Surrender(r) && up === 11 ? 'Rp' : 'P';
       case 7:
         return up <= 7 ? 'P' : null;
       case 6:
@@ -2201,7 +2213,7 @@ table.score tr.total td {
       { id: 'R14v10', kind: 'sur', total: 14, up: 10, index: 3, above: 'R', group: 'Fab4' },
       { id: 'R15v10', kind: 'sur', total: 15, up: 10, index: 0, above: 'R', group: 'Fab4' },
       { id: 'R15v9', kind: 'sur', total: 15, up: 9, index: 2, above: 'R', group: 'Fab4' },
-      { id: 'R15vA', kind: 'sur', total: 15, up: 11, index: r.h17 ? -1 : 1, above: 'R', group: 'Fab4' },
+      { id: 'R15vA', kind: 'sur', total: 15, up: 11, index: extraH17Surrender(r) ? -1 : 1, above: 'R', group: 'Fab4' },
     ];
     return list.filter((d) => {
       if (d.s17only && r.h17) return false;
@@ -2339,35 +2351,35 @@ table.score tr.total td {
     }
   }
 
+  // Tablas para mostrar, con el mismo formato que las de Blackjack Apprenticeship: filas de mayor a
+  // menor, y la rendición en un cuadro aparte (en las demás tablas se ve la jugada sin rendirse).
   function strategyCharts(r) {
-    const hardRows = [
-      { label: '5–8', total: 8 },
-      { label: '9', total: 9 },
-      { label: '10', total: 10 },
-      { label: '11', total: 11 },
-      { label: '12', total: 12 },
-      { label: '13', total: 13 },
-      { label: '14', total: 14 },
-      { label: '15', total: 15 },
-      { label: '16', total: 16 },
-      { label: '17', total: 17 },
-      { label: '18+', total: 18 },
-    ];
+    const sur = r.surrender === 'late';
+    const noSur = (code) => (code === 'Rh' ? 'H' : code === 'Rs' ? 'S' : code === 'Rp' ? 'P' : code);
     const devs = deviationList(r);
     const devAt = (pred) => devs.filter(pred);
+    const hardRows = [
+      { label: '17+', total: 17 },
+      { label: '16', total: 16 },
+      { label: '15', total: 15 },
+      { label: '14', total: 14 },
+      { label: '13', total: 13 },
+      { label: '12', total: 12 },
+      { label: '11', total: 11 },
+      { label: '10', total: 10 },
+      { label: '9', total: 9 },
+      { label: '5–8', total: 8 },
+    ];
     const hard = hardRows.map((row) => ({
       label: row.label,
       key: row.total,
       cells: UPCARDS.map((up) => ({
         up,
-        code: displayCode(hardCode(row.total, up, r), canDoubleHardTotal(row.total, r), r),
-        devs:
-          row.total >= 9 && row.total <= 17
-            ? devAt((d) => (d.kind === 'hard' || d.kind === 'sur') && d.total === row.total && d.up === up)
-            : [],
+        code: displayCode(noSur(hardCode(row.total, up, r)), canDoubleHardTotal(row.total, r), r),
+        devs: devAt((d) => d.kind === 'hard' && d.total === row.total && d.up === up),
       })),
     }));
-    const soft = [2, 3, 4, 5, 6, 7, 8, 9].map((x) => ({
+    const soft = [9, 8, 7, 6, 5, 4, 3, 2].map((x) => ({
       label: `A,${x}`,
       key: 11 + x,
       cells: UPCARDS.map((up) => ({
@@ -2376,20 +2388,34 @@ table.score tr.total td {
         devs: [],
       })),
     }));
-    const pairs = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((pv) => ({
+    const pairs = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2].map((pv) => ({
       label: pv === 11 ? 'A,A' : pv === 10 ? '10,10' : `${pv},${pv}`,
       key: pv,
       cells: UPCARDS.map((up) => {
         const pc = pairCode(pv, up, r);
         let code;
-        if (pc === 'P' || (pc === 'Ph' && r.das)) code = 'P';
-        else if (pc === 'Rp') code = displayCode('Rp', true, r);
-        else code = displayCode(hardCode(pv * 2, up, r), canDoubleHardTotal(pv * 2, r), r);
+        if (pc === 'P' || pc === 'Rp' || (pc === 'Ph' && r.das)) code = 'P';
+        else code = displayCode(noSur(hardCode(pv * 2, up, r)), canDoubleHardTotal(pv * 2, r), r);
         const devs = pv === 10 ? devAt((d) => d.kind === 'pair' && d.up === up) : [];
         return { up, code, devs };
       }),
     }));
-    return { hard, soft, pairs };
+    const surrender = [];
+    if (sur) {
+      const isR = (c) => c === 'Rh' || c === 'Rs';
+      for (const total of [17, 16, 15, 14]) {
+        const cells = UPCARDS.map((up) => ({
+          up,
+          code: isR(hardCode(total, up, r)) ? 'R' : '',
+          devs: devAt((d) => d.kind === 'sur' && d.total === total && d.up === up),
+        }));
+        if (total === 17 && !cells.some((c) => c.code)) continue;
+        surrender.push({ label: String(total), key: total, cells });
+      }
+      const p8 = UPCARDS.map((up) => ({ up, code: pairCode(8, up, r) === 'Rp' ? 'R' : '', devs: [] }));
+      if (p8.some((c) => c.code)) surrender.push({ label: '8,8', key: 'p8', cells: p8 });
+    }
+    return { hard, soft, pairs, surrender };
   }
 
   /* ---------- Ventaja de la casa aproximada ---------- */
@@ -2588,7 +2614,7 @@ table.score tr.total td {
   const AVAIL_KEY = { H: 'hit', S: 'stand', D: 'double', P: 'split', R: 'surrender' };
   const SPEEDS = { slow: 650, normal: 380, fast: 190, instant: 0 };
   const BOT_NAMES = ['Marta', 'Joel', 'Inés', 'Raúl'];
-  const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', Rh: 'R', Rs: 'Rs', Rp: 'Rp' };
+  const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -3265,12 +3291,13 @@ table.score tr.total td {
     );
   }
 
+  const extraSur = (r) => r.h17 && r.surrender === 'late' && r.h17ExtraSurrender;
   function rulesSummary(r) {
     return [
       `${r.decks} mazos`,
       r.h17 ? 'H17' : 'S17',
       r.das ? 'DAS' : 'sin DAS',
-      r.surrender === 'late' ? 'rendición' : 'sin rendición',
+      r.surrender === 'late' ? (extraSur(r) ? 'rendición (+ extras H17)' : 'rendición') : 'sin rendición',
       `separar hasta ${r.maxHands}`,
       r.resplitAces ? 'RSA' : 'sin RSA',
       r.doubleOn === 'any' ? 'doblar 2 cartas' : `doblar ${r.doubleOn}`,
@@ -4375,6 +4402,8 @@ table.score tr.total td {
   }
 
   const CODE_TITLE = {
+    R: 'Rendirse',
+    '': '',
     H: 'Pedir',
     S: 'Plantarse',
     D: 'Doblar (si no se puede, pedir)',
@@ -4385,14 +4414,12 @@ table.score tr.total td {
     Rp: 'Rendirse (si no se puede, separar)',
   };
 
+  const CHART_TITLE = { pairs: 'Parejas', soft: 'Manos blandas', hard: 'Manos duras', surrender: 'Rendición tardía' };
   function chartFor(kind, r) {
-    const charts = BJ.strategyCharts(r);
-    if (kind === 'hard') return { title: 'Manos duras', rows: charts.hard };
-    if (kind === 'soft') return { title: 'Manos blandas', rows: charts.soft };
-    return { title: 'Parejas', rows: charts.pairs };
+    return { title: CHART_TITLE[kind], rows: BJ.strategyCharts(r)[kind] };
   }
   function chartKey(kind, row) {
-    if (kind === 'hard') return row <= 8 ? 8 : row >= 18 ? 18 : row;
+    if (kind === 'hard') return row <= 8 ? 8 : row >= 17 ? 17 : row;
     return row;
   }
 
@@ -4476,9 +4503,13 @@ table.score tr.total td {
         ok && $('sd-auto').checked ? 'Siguiente en un momento…' : 'Pulsa <b>Enter</b> o el botón para la siguiente.',
       ],
     );
-    const kind = d.kind === 'pair' || BJ.isPair(c.cards) ? 'pair' : d.kind;
+    // La casilla a resaltar: la rendición tiene su propio cuadro, como en Blackjack Apprenticeship.
+    const pair = BJ.isPair(c.cards);
+    const kind = d.action === 'R' ? 'surrender' : pair ? 'pairs' : d.kind;
     const ch = chartFor(kind, r);
-    const row = kind === 'pair' ? (c.cards[0].v === 1 ? 11 : c.cards[0].v) : chartKey(kind, BJ.handValue(c.cards).total);
+    const total = BJ.handValue(c.cards).total;
+    const row =
+      kind === 'surrender' ? (d.code === 'Rp' ? 'p8' : total) : kind === 'pairs' ? (c.cards[0].v === 1 ? 11 : c.cards[0].v) : chartKey(kind, total);
     $('sd-chart-title').textContent = ch.title;
     $('sd-chart').replaceChildren(chartTable(ch.rows, { hl: { key: row, up: c.upV }, noIx: true }));
     const next = h('button', { class: 'btn primary', type: 'button', onclick: sdNext }, 'Siguiente', h('kbd', null, '↵'));
@@ -4929,8 +4960,7 @@ table.score tr.total td {
       ['Ds', 'Doblar; si no se puede, plantarse'],
       ['P', 'Separar'],
     ];
-    if (r.surrender === 'late')
-      legendItems.push(['Rh', 'Rendirse; si no se puede, pedir'], ['Rs', 'Rendirse; si no, plantarse'], ['Rp', 'Rendirse; si no, separar']);
+    if (r.surrender === 'late') legendItems.push(['R', 'Rendirse (cuadro de rendición)']);
     fill(
       $('tb-legend'),
       ...legendItems.map(([c, t]) => h('span', null, h('i', { class: 'c-' + c, style: `background:var(--a-${actionVar(c)})` }, CODE_LABEL[c]), t)),
@@ -4940,25 +4970,55 @@ table.score tr.total td {
     const other = BJ.strategyCharts(Object.assign({}, r, { h17: !r.h17 }));
     const marks = new Set();
     const changes = [];
-    for (const kind of ['hard', 'soft', 'pairs'])
-      charts[kind].forEach((row, i) =>
-        row.cells.forEach((c, j) => {
-          const alt = other[kind][i].cells[j].code;
-          if (alt === c.code) return;
-          marks.add(`${kind}:${row.key}:${c.up}`);
-          const s17 = r.h17 ? alt : c.code;
-          const h17 = r.h17 ? c.code : alt;
-          changes.push(`${row.label} vs ${BJ.upLabel(c.up)}: ${CODE_TITLE[s17].split(' (')[0]} → ${CODE_TITLE[h17].split(' (')[0]}`);
-        }),
-      );
+    const KINDS = ['pairs', 'soft', 'hard', 'surrender'];
+    const word = (code) => (code ? CODE_TITLE[code].split(' (')[0] : 'no rendirse');
+    for (const kind of KINDS) {
+      const keys = new Set([...charts[kind], ...other[kind]].map((row) => row.key));
+      for (const key of keys) {
+        const mine = charts[kind].find((row) => row.key === key);
+        const alt = other[kind].find((row) => row.key === key);
+        for (const up of BJ.UPCARDS) {
+          const a = mine ? mine.cells.find((c) => c.up === up).code : '';
+          const b = alt ? alt.cells.find((c) => c.up === up).code : '';
+          if (a === b) continue;
+          if (mine) marks.add(`${kind}:${key}:${up}`);
+          const label = (mine || alt).label;
+          const s17 = r.h17 ? b : a;
+          const h17 = r.h17 ? a : b;
+          changes.push(`${kind === 'surrender' ? 'Rendición ' : ''}${label} vs ${BJ.upLabel(up)}: ${word(s17)} → ${word(h17)}`);
+        }
+      }
+    }
     $('tb-h17').textContent = r.h17
       ? `El crupier pide con 17 blando (H17). Las casillas marcadas cambian respecto a S17: ${changes.join(' · ')}.`
       : `El crupier se planta con 17 blando (S17). Las casillas marcadas cambiarían con H17: ${changes.join(' · ')}.`;
-    const block = (title, kind, corner) =>
-      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })));
-    $('tb-charts').replaceChildren(
-      block('Manos duras', 'hard', 'Total'),
-      h('div', { class: 'side' }, block('Manos blandas', 'soft', 'Mano'), block('Parejas', 'pairs', 'Pareja')),
+    const block = (kind, corner) =>
+      h(
+        'div',
+        { class: 'panel' },
+        h('h3', null, CHART_TITLE[kind]),
+        h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })),
+      );
+    fill(
+      $('tb-charts'),
+      block('pairs', 'Pareja'),
+      block('soft', 'Mano'),
+      block('hard', 'Total'),
+      charts.surrender.length
+        ? h(
+            'div',
+            { class: 'panel' },
+            h('h3', null, CHART_TITLE.surrender),
+            h('div', { class: 'chart-wrap' }, chartTable(charts.surrender, { noIx, corner: 'Total', marks, kind: 'surrender' })),
+            h('p', { class: 'small muted' }, 'Solo con las dos primeras cartas. Si no se puede rendir, se juega lo que dicen las otras tablas.'),
+          )
+        : null,
+      h(
+        'div',
+        { class: 'panel' },
+        h('h3', null, 'Seguro y pago igual'),
+        h('p', null, h('b', null, 'No tomarlos.'), settings.training.useDeviations ? ' Si cuentas cartas: tómalos solo con true count +3 o más.' : ''),
+      ),
     );
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
@@ -5029,6 +5089,12 @@ table.score tr.total td {
     { key: 'hitSplitAces', label: 'Pedir con ases separados', hint: 'Lo normal es una sola carta por as.', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'doubleOn', label: 'Doblar con', options: [['any', 'Dos cartas cualesquiera'], ['9-11', '9, 10, 11'], ['10-11', '10 y 11']] },
     { key: 'surrender', label: 'Rendición', hint: 'Tardía: después de que el crupier revisa si tiene blackjack.', options: [['late', 'Tardía'], ['none', 'No']] },
+    {
+      key: 'h17ExtraSurrender',
+      label: 'Con H17, rendirse también con 15 y 17 vs A y 8,8 vs A',
+      hint: 'La tabla de Blackjack Apprenticeship no las incluye. Según Wizard of Odds son un poco mejores.',
+      options: [[false, 'No'], [true, 'Sí']],
+    },
     { key: 'bjPays', label: 'Blackjack paga', options: [[1.5, '3 a 2'], [1.2, '6 a 5']] },
     {
       key: 'penetration',

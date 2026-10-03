@@ -1218,10 +1218,14 @@ td.c-Ds {
 td.c-P {
   background: var(--a-p);
 }
+td.c-R,
 td.c-Rh,
 td.c-Rs,
 td.c-Rp {
   background: var(--a-r);
+}
+td.c- {
+  background: var(--panel-2);
 }
 td .ix {
   position: absolute;
