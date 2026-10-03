@@ -24,6 +24,10 @@
     <div class="bank"><button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
   </header>
 
+  <div class="install-banner" id="update-banner" hidden>
+    <div class="install-text"><b>Hay una versión nueva de Seis Mazos</b><span>Toca «Actualizar» cuando termines la mano.</span></div>
+    <button class="btn small primary" type="button" id="update-btn">Actualizar</button>
+  </div>
   <div class="install-banner" id="install-banner" hidden>
     <div class="install-text"><b>Instala Seis Mazos en tu teléfono</b><span id="install-how"></span></div>
     <button class="btn small primary" type="button" id="install-banner-btn" hidden>Instalar</button>
@@ -71,6 +75,7 @@
               <span id="status-msg" aria-live="polite"></span>
               <span class="rules-line" id="rules-line"></span>
             </div>
+            <div class="flash-fb" id="flash-fb" role="status" aria-live="polite" hidden></div>
             <div class="controls" id="controls"></div>
             <div class="table-opts" id="table-opts">
               <span>Jugadores robot en la mesa</span>
@@ -209,9 +214,10 @@
     <section id="view-tablas" role="tabpanel" aria-labelledby="tab-tablas" hidden>
       <div class="drill-main">
         <div class="section-head">
-          <h2>Estrategia básica</h2>
-          <span class="muted small" id="tb-rules"></span>
+          <h2 id="tb-title">Estrategia básica</h2>
+          <div class="seg" id="tb-h17-seg" role="radiogroup" aria-label="Qué hace el crupier con 17 blando"></div>
         </div>
+        <p class="muted small" id="tb-rules"></p>
         <div class="toolbar">
           <label class="check"><input type="checkbox" id="tb-ix" checked> Marcar los índices de desviación en cada casilla</label>
         </div>

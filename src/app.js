@@ -390,9 +390,9 @@
   function askP(p, kind, data) {
     return p.local ? ask(kind, data) : NET.ask(p, kind, data);
   }
-  function feedback(p, verdict, title, lines) {
-    if (p.local) showFeedback($('feedback'), verdict, title, lines);
-    else NET.send(p, { t: 'fb', verdict, title, lines });
+  function feedback(p, verdict, title, lines, quiet) {
+    if (p.local) showFeedback($('feedback'), verdict, title, lines, quiet);
+    else NET.send(p, { t: 'fb', verdict, title, lines, quiet: !!quiet });
   }
   function applyStat(d, err) {
     for (const k in d) stats[k] = (stats[k] || 0) + d[k];
@@ -729,7 +729,16 @@
     const box = $('controls');
     const p = T.pending;
     box.replaceChildren();
-    if (!p) return;
+    if (!p) {
+      if (NET.role === 'host')
+        for (const x of players)
+          if (!x.local && !x.gone && x.away)
+            box.append(
+              h('span', { class: 'small muted' }, `${x.name} salió de la app.`),
+              h('button', { class: 'btn small', type: 'button', onclick: () => guestGone(x, `Seguís sin ${x.name}.`) }, `Seguir sin ${x.name}`),
+            );
+      return;
+    }
     if (p.kind === 'bet') {
       const unit = tableUnit();
       const chips = [5, 25, 100, 500].map((v) =>
@@ -859,13 +868,32 @@
   }
 
   /* ---------- Panel lateral ---------- */
-  function showFeedback(box, verdict, title, lines) {
+  function showFeedback(box, verdict, title, lines, quiet) {
     const mark = verdict === 'ok' ? '✓' : verdict === 'bad' ? '✗' : 'i';
     fill(
       box,
       h('div', { class: 'verdict ' + verdict }, h('span', { class: 'mark' }, mark), h('span', null, title)),
       lines && lines.length ? h('ul', { class: 'why' }, lines.map((l) => h('li', { html: l }))) : null,
     );
+    if (box.id === 'feedback' && !(quiet && verdict === 'ok')) flashFeedback(verdict, mark, title, lines);
+  }
+
+  // Corrección al instante, justo encima de los botones de la mesa (visible también en el teléfono).
+  let flashTimer = null;
+  function flashFeedback(verdict, mark, title, lines) {
+    const el = $('flash-fb');
+    clearTimeout(flashTimer);
+    fill(
+      el,
+      h('span', { class: 'mark' }, mark),
+      h('div', null, h('b', null, title), lines && lines.length ? h('span', { class: 'flash-why', html: lines[lines.length > 1 && verdict !== 'info' ? lines.length - 1 : 0] }) : null),
+    );
+    el.className = 'flash-fb ' + verdict;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    flashTimer = setTimeout(() => (el.hidden = true), verdict === 'bad' ? 9000 : verdict === 'ok' ? 3500 : 6000);
   }
 
   function renderStats() {
@@ -1067,9 +1095,13 @@
     const s = targets[0];
     const err = ok ? null : { what: `Apuesta ${money(bet)}`, tc: `TC ${signed(tcx, 1)}`, you: `${Number(units.toFixed(2))} u`, right: `${s} u` };
     recordStat(p, { bets: 1, betsOk: ok ? 1 : 0 }, err);
-    feedback(p, ok ? 'ok' : 'bad', ok ? `Apuesta de ${money(bet)}: acorde a la rampa` : `Apuesta de ${money(bet)}: fuera de la rampa`, [
-      `Rampa (TC − 1) unidades: con TC ${signed(tcx, 1)} tocan <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${Number(units.toFixed(2))} u.`,
-    ]);
+    feedback(
+      p,
+      ok ? 'ok' : 'bad',
+      ok ? `Apuesta de ${money(bet)}: acorde a la rampa` : `Apuesta de ${money(bet)}: fuera de la rampa`,
+      [`Rampa (TC − 1) unidades: con TC ${signed(tcx, 1)} tocan <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${Number(units.toFixed(2))} u.`],
+      true,
+    );
   }
 
   async function countQuiz(p) {
@@ -1268,19 +1300,31 @@
   }
 
   /* ======================================================================
-   * EN LÍNEA (PeerJS): un teléfono crea la mesa, el otro se une con un código.
+   * EN LÍNEA: los mensajes viajan por servidores públicos de mensajería (MQTT sobre WebSocket
+   * seguro). Los teléfonos no se conectan entre sí, así que funciona con datos móviles y con
+   * cualquier wifi. Quien crea la mesa escucha en varios servidores a la vez; quien se une prueba
+   * uno tras otro hasta que la mesa le contesta.
    * ==================================================================== */
-  const PROTO = 1;
-  const PEER_PREFIX = 'seismazos-v1-';
+  const PROTO = 2;
+  const TOPIC = 'seismazos/v2/';
+  const BROKERS = [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://mqtt.eclipseprojects.io:443/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt',
+  ];
   const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const MAX_GUESTS = 3;
+  const SILENCE_MS = 90000;
   const NET = {
     role: 'solo', // 'solo' | 'host' | 'joining' | 'guest'
     mode: 'solo', // 'solo' | 'coop' | 'indiv'
     pickMode: 'coop',
-    peer: null,
     code: '',
-    hostConn: null,
+    cid: '', // identificador de este teléfono en la mesa
+    clients: [], // anfitrión: un cliente por servidor
+    client: null, // invitado: el servidor por el que habla con la mesa
+    ready: false,
     myId: 'p1',
     view: null,
     viewRules: '',
@@ -1294,40 +1338,36 @@
     wakeLock: null,
 
     available() {
-      return typeof window.Peer === 'function';
+      return typeof window.mqtt === 'object' && typeof window.mqtt.connect === 'function';
     },
-    options() {
+    brokers() {
       try {
-        const o = JSON.parse(localStorage.getItem('seis-mazos-peer') || 'null');
-        if (o && typeof o === 'object') return o;
+        const own = JSON.parse(localStorage.getItem('seis-mazos-brokers') || 'null');
+        if (Array.isArray(own) && own.length) return own;
       } catch (e) {
         /* sin configuración propia */
       }
-      return { debug: 0 };
+      return BROKERS;
     },
     send(p, msg) {
-      const c = p.conn;
-      if (!c || p.gone) return;
-      try {
-        c.send(msg);
-      } catch (e) {
-        /* conexión cerrada */
-      }
+      if (!p.client || p.gone) return;
+      publish(p.client, `${TOPIC}${this.code}/g/${p.cid}`, msg);
     },
     sendHost(msg) {
-      try {
-        if (this.hostConn) this.hostConn.send(msg);
-      } catch (e) {
-        /* conexión cerrada */
-      }
+      if (this.client) publish(this.client, `${TOPIC}${this.code}/h`, Object.assign({ from: this.cid }, msg));
     },
     ask(p, kind, data) {
       return new Promise((resolve) => {
-        if (!p.conn || p.gone) return resolve(null);
+        if (!p.client || p.gone) return resolve(null);
         const rid = ++this.reqSeq;
-        this.reqs.set(rid, { resolve, pid: p.id });
-        this.send(p, { t: 'ask', rid, kind, data });
+        const msg = { t: 'ask', rid, kind, data };
+        this.reqs.set(rid, { resolve, pid: p.id, msg });
+        this.send(p, msg);
       });
+    },
+    // Vuelve a mandar lo que el jugador tenga pendiente (por si se perdió mientras no estaba).
+    resendAsks(p) {
+      for (const r of this.reqs.values()) if (r.pid === p.id) this.send(p, r.msg);
     },
     dropRequests(pid) {
       for (const [rid, r] of this.reqs)
@@ -1341,6 +1381,48 @@
     },
   };
 
+  function publish(client, topic, msg) {
+    try {
+      client.publish(topic, JSON.stringify(msg), { qos: 1 });
+    } catch (e) {
+      /* el cliente se reconecta solo */
+    }
+  }
+  function parseMsg(payload) {
+    try {
+      const msg = JSON.parse(payload.toString());
+      return msg && typeof msg === 'object' ? msg : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function randomId() {
+    return Math.floor(rng() * 2176782336).toString(36) + Math.floor(rng() * 2176782336).toString(36);
+  }
+  // `will`: aviso que el servidor publica solo si este teléfono se desconecta de golpe.
+  function mqttOptions(will) {
+    return {
+      will: will ? { topic: will.topic, payload: JSON.stringify(will.msg), qos: 1, retain: false } : undefined,
+      clientId: 'sm-' + NET.cid + '-' + randomId().slice(0, 4),
+      clean: false, // el servidor guarda los mensajes si el teléfono se desconecta un momento
+      reconnectPeriod: 2000,
+      connectTimeout: 7000,
+      keepalive: 30,
+      protocolVersion: 4,
+      resubscribe: true,
+    };
+  }
+  function closeClient(c) {
+    if (!c) return;
+    setTimeout(() => {
+      try {
+        c.end(true);
+      } catch (e) {
+        /* ya cerrado */
+      }
+    }, 300);
+  }
+
   function randomCode() {
     let s = '';
     for (let i = 0; i < 4; i++) s += CODE_ALPHABET[Math.floor(rng() * CODE_ALPHABET.length)];
@@ -1348,19 +1430,10 @@
   }
   function myToken() {
     if (!state.token) {
-      state.token = Math.floor(rng() * 1e12).toString(36) + Math.floor(rng() * 1e12).toString(36);
+      state.token = randomId() + randomId();
       save();
     }
     return state.token;
-  }
-
-  function peerErrorText(err) {
-    const type = err && err.type;
-    if (type === 'peer-unavailable') return 'No hay ninguna mesa abierta con ese código. Revisa las letras.';
-    if (type === 'network' || type === 'socket-error' || type === 'socket-closed' || type === 'server-error')
-      return 'No hay conexión con el servidor de mesas. Revisa tu internet e inténtalo de nuevo.';
-    if (type === 'browser-incompatible') return 'Este navegador no permite jugar en línea.';
-    return 'No se pudo conectar' + (type ? ` (${type})` : '') + '. Inténtalo de nuevo.';
   }
 
   async function keepAwake() {
@@ -1380,125 +1453,142 @@
         for (const p of players)
           if (!p.local && !p.gone) {
             NET.send(p, { t: 'ping' });
-            if (now - (p.lastHeard || now) > 45000) guestGone(p, `${p.name} dejó de responder.`);
+            if (now - (p.lastHeard || now) > SILENCE_MS) guestGone(p, `${p.name} dejó de responder.`);
           }
       } else if (NET.role === 'guest') {
         NET.sendHost({ t: 'ping' });
-        if (now - NET.lastHeard > 45000) leaveOnline('Se perdió la conexión con la mesa.');
+        if (now - NET.lastHeard > SILENCE_MS) leaveOnline('Se perdió la conexión con la mesa.');
       }
-    }, 4000);
+    }, 5000);
+  }
+
+  // Al volver a la app (el teléfono la congela en segundo plano), se resincroniza en vez de cortar.
+  function onResume() {
+    if (NET.role === 'solo' || NET.role === 'joining') return;
+    keepAwake();
+    const now = Date.now();
+    NET.lastHeard = now;
+    if (NET.role === 'guest') NET.sendHost({ t: 'hello', v: PROTO, bank: state.bankroll, token: myToken() });
+    else
+      for (const p of players)
+        if (!p.local && !p.gone) {
+          p.lastHeard = now;
+          NET.send(p, { t: 'view', m: T.model || buildModel() });
+          NET.resendAsks(p);
+        }
   }
 
   function hostTable(mode) {
     if (!NET.available()) return;
     NET.mode = mode;
     NET.role = 'host';
+    NET.cid = randomId();
+    NET.code = randomCode();
+    NET.ready = false;
     NET.status = 'Abriendo la mesa…';
     ME.session = emptySession();
     players = [ME];
     team.bank = 2 * START_BANK;
     renderOnline();
-    const open = (attempt) => {
-      const code = randomCode();
-      const peer = new window.Peer(PEER_PREFIX + code, NET.options());
-      NET.peer = peer;
-      peer.on('open', () => {
-        NET.code = code;
-        NET.status = 'Mesa abierta. Dale el código a tu compañero.';
+    const inbox = `${TOPIC}${NET.code}/h`;
+    const hostWill = { topic: `${TOPIC}${NET.code}/host`, msg: { t: 'away' } };
+    NET.clients = NET.brokers().map((url) => {
+      const c = window.mqtt.connect(url, mqttOptions(hostWill));
+      c.on('connect', () => {
+        c.subscribe(inbox, { qos: 1 });
+        publish(c, `${TOPIC}${NET.code}/host`, { t: 'back' });
+        if (!NET.ready && NET.role === 'host') {
+          NET.ready = true;
+          clearTimeout(NET.joinTimer);
+          NET.status = 'Mesa abierta. Dale el código a la otra persona.';
+          renderOnline();
+          renderControls();
+          renderTable();
+          keepAwake();
+          startHeartbeat();
+        }
+      });
+      c.on('message', (topic, payload) => {
+        if (NET.role === 'host') onHostMessage(c, parseMsg(payload));
+      });
+      c.on('error', () => {
+        /* se reintenta solo */
+      });
+      return c;
+    });
+    clearTimeout(NET.joinTimer);
+    NET.joinTimer = setTimeout(() => {
+      if (NET.role === 'host' && !NET.ready) leaveOnline('No se pudo abrir la mesa: no hay conexión con los servidores. Revisa tu internet.');
+    }, 15000);
+  }
+
+  function onHostMessage(client, msg) {
+    if (!msg || typeof msg.from !== 'string') return;
+    let p = players.find((x) => !x.local && x.cid === msg.from);
+    if (p) {
+      p.lastHeard = Date.now();
+      if (p.away && msg.t !== 'away') {
+        p.away = false;
+        NET.status = `${p.name} volvió.`;
         renderOnline();
         renderControls();
-        renderTable();
-        keepAwake();
-        startHeartbeat();
-      });
-      peer.on('connection', (conn) => onGuestConnection(conn));
-      peer.on('disconnected', () => {
-        if (NET.peer === peer && NET.role === 'host') {
-          try {
-            peer.reconnect();
-          } catch (e) {
-            /* se reintenta en el siguiente aviso */
-          }
-        }
-      });
-      peer.on('error', (err) => {
-        if (NET.peer !== peer) return;
-        if (err.type === 'unavailable-id' && attempt < 5) {
-          peer.destroy();
-          open(attempt + 1);
-        } else if (err.type !== 'peer-unavailable' && !NET.code) leaveOnline(peerErrorText(err));
-      });
-    };
-    open(0);
-  }
-
-  function onGuestConnection(conn) {
-    conn.on('data', (msg) => onHostData(conn, msg));
-    conn.on('close', () => {
-      const p = players.find((x) => x.conn === conn);
-      if (p) guestGone(p, `${p.name} salió de la mesa.`);
-    });
-    conn.on('error', () => {
-      const p = players.find((x) => x.conn === conn);
-      if (p) guestGone(p, `${p.name} perdió la conexión.`);
-    });
-  }
-
-  function onHostData(conn, msg) {
-    if (!msg || typeof msg !== 'object') return;
-    let p = players.find((x) => x.conn === conn);
-    if (p) p.lastHeard = Date.now();
+      }
+    }
     if (msg.t === 'hello') {
-      if (msg.v !== PROTO) {
-        conn.send({ t: 'reject', reason: 'Tu app y la del anfitrión tienen versiones distintas. Actualizad las dos.' });
-        return setTimeout(() => conn.close(), 300);
-      }
-      p = players.find((x) => x.token && x.token === msg.token);
+      const reply = (m) => publish(client, `${TOPIC}${NET.code}/g/${msg.from}`, m);
+      if (msg.v !== PROTO) return reply({ t: 'reject', reason: 'Las dos apps tienen versiones distintas. Ábrelas con internet para que se actualicen.' });
+      p = players.find((x) => !x.local && x.token && x.token === msg.token);
       if (!p) {
-        if (humans().filter((x) => !x.local).length >= MAX_GUESTS) {
-          conn.send({ t: 'reject', reason: 'La mesa está llena.' });
-          return setTimeout(() => conn.close(), 300);
-        }
+        if (humans().filter((x) => !x.local).length >= MAX_GUESTS) return reply({ t: 'reject', reason: 'La mesa está llena.' });
         p = { id: 'p' + ++NET.guestSeq, local: false, token: msg.token, session: emptySession(), bank: START_BANK };
+        p.name = 'Jugador ' + p.id.slice(1);
         players.push(p);
+        if (typeof msg.bank === 'number' && NET.mode === 'indiv') p.bank = msg.bank;
+        NET.status = `${p.name} se unió a la mesa.`;
       }
-      p.conn = conn;
+      const wasGone = p.gone;
+      p.cid = msg.from;
+      p.client = client;
       p.gone = false;
+      p.away = false;
       p.lastHeard = Date.now();
-      p.name = 'Jugador ' + p.id.slice(1);
-      if (typeof msg.bank === 'number' && NET.mode === 'indiv' && !p.session.decisions) p.bank = msg.bank;
+      if (wasGone) NET.status = `${p.name} volvió a la mesa.`;
       NET.send(p, { t: 'welcome', id: p.id, mode: NET.mode, code: NET.code });
+      NET.resendAsks(p);
       if (T.betCollector) T.betCollector.request(p);
-      else T.msgFor[p.id] = 'Entrarás en la próxima mano.';
-      NET.status = `${p.name} se unió a la mesa.`;
+      else if (!T.seats.some((s) => s.pid === p.id)) T.msgFor[p.id] = 'Entrarás en la próxima mano.';
       renderOnline();
       renderTable();
+      NET.send(p, { t: 'view', m: T.model || buildModel() });
+    } else if (!p) {
+      return;
     } else if (msg.t === 'answer') {
       const r = NET.reqs.get(msg.rid);
-      if (r && p && r.pid === p.id) {
+      if (r && r.pid === p.id) {
         NET.reqs.delete(msg.rid);
         r.resolve(msg.value);
       }
     } else if (msg.t === 'ping') {
-      if (p) NET.send(p, { t: 'pong' });
+      NET.send(p, { t: 'pong' });
     } else if (msg.t === 'bye') {
-      if (p) guestGone(p, `${p.name} salió de la mesa.`);
+      guestGone(p, `${p.name} salió de la mesa.`);
+    } else if (msg.t === 'away' && !p.gone) {
+      p.away = true;
+      NET.status = `${p.name} salió de la app. Si no vuelve, toca «Seguir sin ${p.name}».`;
+      renderOnline();
+      renderControls();
     }
   }
 
   function guestGone(p, text) {
     if (p.gone) return;
     p.gone = true;
-    try {
-      if (p.conn) p.conn.close();
-    } catch (e) {
-      /* ya cerrada */
-    }
-    p.conn = null;
+    p.away = false;
     NET.dropRequests(p.id);
     NET.status = text;
     if (T.betCollector) T.betCollector.check();
     renderOnline();
+    renderControls();
     renderTable();
   }
 
@@ -1517,48 +1607,84 @@
     }
     NET.role = 'joining';
     NET.code = code;
-    NET.status = `Conectando con la mesa ${code}…`;
+    NET.cid = randomId();
+    NET.status = `Buscando la mesa ${code}…`;
     renderOnline();
-    const peer = new window.Peer(NET.options());
-    NET.peer = peer;
-    peer.on('open', () => {
-      const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
-      NET.hostConn = conn;
-      conn.on('open', () => conn.send({ t: 'hello', v: PROTO, bank: state.bankroll, token: myToken() }));
-      conn.on('data', onGuestData);
-      conn.on('close', () => {
-        if (NET.hostConn === conn) leaveOnline(NET.role === 'guest' ? 'La mesa se cerró.' : 'No se pudo entrar en la mesa.');
+    const urls = NET.brokers();
+    let i = 0;
+    const tryNext = () => {
+      if (NET.role !== 'joining') return;
+      if (i >= urls.length)
+        return leaveOnline(
+          `No contestó ninguna mesa con el código ${code}. Comprueba las letras y que en el otro teléfono la mesa siga abierta y con la app en pantalla.`,
+        );
+      const url = urls[i++];
+      NET.status = urls.length > 1 ? `Buscando la mesa ${code}… (servidor ${i} de ${urls.length})` : `Buscando la mesa ${code}…`;
+      renderOnline();
+      const c = window.mqtt.connect(url, mqttOptions({ topic: `${TOPIC}${code}/h`, msg: { from: NET.cid, t: 'away' } }));
+      NET.client = c;
+      let settled = false;
+      const giveUp = () => {
+        if (settled || NET.client !== c) return;
+        settled = true;
+        NET.client = null;
+        closeClient(c);
+        tryNext();
+      };
+      const timer = setTimeout(giveUp, 6000);
+      c.on('connect', () => {
+        if (NET.client !== c) return;
+        c.subscribe([`${TOPIC}${code}/g/${NET.cid}`, `${TOPIC}${code}/host`], { qos: 1 }, () => {
+          NET.sendHost({ t: 'hello', v: PROTO, bank: state.bankroll, token: myToken() });
+        });
       });
-      conn.on('error', () => {
-        if (NET.hostConn === conn) leaveOnline('Se perdió la conexión con la mesa.');
+      c.on('message', (topic, payload) => {
+        if (NET.client !== c) return;
+        const msg = parseMsg(payload);
+        if (!msg) return;
+        if (msg.t === 'welcome' || msg.t === 'reject') {
+          settled = true;
+          clearTimeout(timer);
+        }
+        onGuestData(msg);
       });
-    });
-    peer.on('error', (err) => {
-      if (NET.peer === peer) leaveOnline(peerErrorText(err));
-    });
-    clearTimeout(NET.joinTimer);
-    NET.joinTimer = setTimeout(() => {
-      if (NET.role === 'joining') leaveOnline('No respondió ninguna mesa con ese código. Comprueba que sigue abierta en el otro teléfono.');
-    }, 20000);
+      c.on('error', () => {
+        if (!settled) giveUp();
+      });
+    };
+    tryNext();
   }
 
   function onGuestData(msg) {
-    if (!msg || typeof msg !== 'object') return;
     NET.lastHeard = Date.now();
+    if (msg.t === 'away' || msg.t === 'back') {
+      NET.hostAway = msg.t === 'away';
+      NET.status = NET.hostAway ? 'Quien creó la mesa salió de la app. Esperando a que vuelva…' : '';
+      renderOnline();
+      return;
+    }
+    if (NET.hostAway) {
+      NET.hostAway = false;
+      NET.status = '';
+      renderOnline();
+    }
     if (msg.t === 'welcome') {
-      clearTimeout(NET.joinTimer);
+      const first = NET.role !== 'guest';
       NET.role = 'guest';
       NET.myId = msg.id;
       NET.mode = msg.mode;
-      NET.status = '';
-      T.loopGen++; // la partida local se detiene: ahora manda el anfitrión
-      T.pending = null;
-      T.veilHud = false;
-      renderControls();
-      showTab('mesa');
+      NET.code = msg.code || NET.code;
+      if (first) {
+        NET.status = '';
+        T.loopGen++; // la partida local se detiene: ahora manda la mesa en línea
+        T.pending = null;
+        T.veilHud = false;
+        renderControls();
+        showTab('mesa');
+        keepAwake();
+        startHeartbeat();
+      }
       renderOnline();
-      keepAwake();
-      startHeartbeat();
     } else if (msg.t === 'view') {
       NET.view = msg.m;
       const rules = JSON.stringify(msg.m.rules);
@@ -1569,9 +1695,11 @@
       renderTable();
     } else if (msg.t === 'ask') {
       const rid = msg.rid;
+      if (T.pending && T.pending.rid === rid) return; // ya la tenemos (reenvío)
       if (msg.kind === 'bet' && T.bet <= 0) T.bet = T.lastBet;
       if (msg.kind === 'quiz') T.veilHud = true;
       T.pending = {
+        rid,
         kind: msg.kind,
         data: msg.data || {},
         resolve: (v) => {
@@ -1585,7 +1713,7 @@
       renderControls();
       renderHud();
     } else if (msg.t === 'fb') {
-      showFeedback($('feedback'), msg.verdict, msg.title, msg.lines);
+      showFeedback($('feedback'), msg.verdict, msg.title, msg.lines, msg.quiet);
     } else if (msg.t === 'stat') {
       if (msg.d && msg.d.net && NET.mode === 'indiv') state.bankroll += msg.d.net;
       applyStat(msg.d || {}, msg.err);
@@ -1603,17 +1731,12 @@
     clearInterval(NET.timer);
     clearTimeout(NET.joinTimer);
     if (NET.role === 'host') for (const p of players) if (!p.local && !p.gone) NET.send(p, { t: 'bye' });
-    if (wasGuest) NET.sendHost({ t: 'bye' });
-    const peer = NET.peer;
-    NET.peer = null;
-    NET.hostConn = null;
-    setTimeout(() => {
-      try {
-        if (peer) peer.destroy();
-      } catch (e) {
-        /* ya cerrada */
-      }
-    }, 200);
+    if (NET.role === 'guest') NET.sendHost({ t: 'bye' });
+    for (const c of NET.clients) closeClient(c);
+    closeClient(NET.client);
+    NET.clients = [];
+    NET.client = null;
+    NET.ready = false;
     for (const p of players) if (!p.local) p.gone = true;
     NET.dropRequests();
     NET.role = 'solo';
@@ -1621,6 +1744,7 @@
     NET.code = '';
     NET.view = null;
     NET.viewRules = '';
+    NET.hostAway = false;
     NET.status = reason || '';
     try {
       if (NET.wakeLock) NET.wakeLock.release();
@@ -1703,7 +1827,7 @@
       const others = players.filter((p) => !p.local);
       fill(
         box,
-        NET.code
+        NET.ready
           ? h(
               'div',
               { class: 'code-box' },
@@ -1730,7 +1854,9 @@
           { class: 'net-players' },
           h('li', null, 'Tú (creaste la mesa)'),
           others.length
-            ? others.map((p) => h('li', { class: p.gone ? 'muted' : null }, `${p.name}${p.gone ? ' · desconectado' : ' · conectado'}`))
+            ? others.map((p) =>
+                h('li', { class: p.gone ? 'muted' : null }, `${p.name}${p.gone ? ' · fuera de la mesa' : p.away ? ' · salió de la app' : ' · conectado'}`),
+              )
             : h('li', { class: 'muted' }, 'Esperando a que alguien se una…'),
         ),
         status,
@@ -2345,6 +2471,17 @@
   function renderTablas() {
     const r = activeRules();
     $('tb-rules').textContent = rulesSummary(r);
+    $('tb-title').textContent = r.h17
+      ? 'Tabla H17: el crupier pide con 17 blando (hit soft 17)'
+      : 'Tabla S17: el crupier se planta con 17 blando (stand on 17)';
+    seg('tb-h17-seg', 'tb-h17-seg', [[false, 'Se planta (S17)'], [true, 'Pide (H17)']], r.h17, (v) => {
+      if (NET.role === 'guest') return renderTablas();
+      settings.rules.h17 = v;
+      buildForm('rules-form', RULE_FIELDS, settings.rules, onRuleChange);
+      renderOnline();
+      onRuleChange('h17');
+    });
+    document.querySelectorAll('#tb-h17-seg input').forEach((i) => (i.disabled = NET.role === 'guest'));
     const charts = BJ.strategyCharts(r);
     const noIx = !$('tb-ix').checked;
     const legendItems = [
@@ -2722,7 +2859,24 @@
     if (!window.SEIS_MAZOS_PWA) return;
     const standalone = isStandalone();
     $('install-panel').hidden = standalone;
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker
+        .register('sw.js')
+        .then((reg) => {
+          const check = () => reg.update().catch(() => {});
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') check();
+          });
+          setInterval(check, 15 * 60 * 1000);
+        })
+        .catch(() => {});
+      // Cuando se instala una versión nueva, se ofrece recargar (sin cortar una mano en curso).
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hadController) $('update-banner').hidden = false;
+      });
+      $('update-btn').addEventListener('click', () => location.reload());
+    }
     let dismissed = false;
     try {
       dismissed = localStorage.getItem(INSTALL_DISMISSED) === '1';
@@ -2874,8 +3028,9 @@
     // En línea e instalación
     renderOnline();
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && NET.role !== 'solo') keepAwake();
+      if (document.visibilityState === 'visible') onResume();
     });
+    window.addEventListener('pageshow', onResume);
     setupInstall();
 
     renderAllRuleViews();

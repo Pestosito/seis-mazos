@@ -748,6 +748,60 @@ button.chip:active {
   color: var(--muted);
   font-size: 0.78rem;
 }
+.flash-fb {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.flash-fb.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.flash-fb.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.flash-fb.info {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.flash-fb .mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: var(--panel);
+}
+.flash-fb > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.flash-why {
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+.flash-fb.pop {
+  animation: pop 240ms ease-out;
+}
+@keyframes pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -1569,7 +1623,8 @@ table.score tr.total td {
 }
 @media (prefers-reduced-motion: reduce) {
   .card.deal-in,
-  .card.flip {
+  .card.flip,
+  .flash-fb.pop {
     animation: none;
   }
   .btn,

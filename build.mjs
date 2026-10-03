@@ -10,7 +10,7 @@ const read = (p) => readFileSync(url(p), 'utf8');
 
 // Versión: huella de las fuentes; se muestra en Reglas → Mantenimiento y nombra la caché.
 const version = createHash('sha256')
-  .update(['template.html', 'styles.css', 'engine.js', 'app.js', 'sw.js', 'vendor/peerjs.min.js'].map((f) => read('./src/' + f)).join('\n'))
+  .update(['template.html', 'styles.css', 'engine.js', 'app.js', 'sw.js', 'vendor/mqtt.min.js'].map((f) => read('./src/' + f)).join('\n'))
   .digest('hex')
   .slice(0, 8);
 
@@ -44,7 +44,7 @@ ${page.slice(cut).trim()}
 mkdirSync(url('./dist/'), { recursive: true });
 const fragment = page();
 writeFileSync(url('./dist/index.html'), fragment);
-writeFileSync(url('./dist/blackjack.html'), doc(page({ vendor: `<script>\n${read('./src/vendor/peerjs.min.js')}\n</script>` })));
+writeFileSync(url('./dist/blackjack.html'), doc(page({ vendor: `<script>\n${read('./src/vendor/mqtt.min.js')}\n</script>` })));
 
 // App instalable
 const pwaHead = `<meta name="description" content="Practica blackjack: estrategia básica, conteo Hi-Lo y desviaciones, solo o con otra persona.">
@@ -57,14 +57,14 @@ const pwaHead = `<meta name="description" content="Practica blackjack: estrategi
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Seis Mazos">
 <script>window.SEIS_MAZOS_PWA = true;</script>`;
-const appHtml = doc(page({ head: pwaHead, vendor: '<script src="peerjs.min.js"></script>' }));
+const appHtml = doc(page({ head: pwaHead, vendor: '<script src="mqtt.min.js"></script>' }));
 rmSync(url('./app/'), { recursive: true, force: true });
 mkdirSync(url('./app/icons/'), { recursive: true });
 writeFileSync(url('./app/index.html'), appHtml);
 writeFileSync(url('./app/sw.js'), read('./src/sw.js').replace('__VERSION__', version));
 copyFileSync(url('./src/manifest.webmanifest'), url('./app/manifest.webmanifest'));
-copyFileSync(url('./src/vendor/peerjs.min.js'), url('./app/peerjs.min.js'));
-copyFileSync(url('./src/vendor/PEERJS-LICENSE.txt'), url('./app/PEERJS-LICENSE.txt'));
+copyFileSync(url('./src/vendor/mqtt.min.js'), url('./app/mqtt.min.js'));
+copyFileSync(url('./src/vendor/MQTTJS-LICENSE.md'), url('./app/MQTTJS-LICENSE.md'));
 for (const f of ['icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'])
   copyFileSync(url('./src/icons/' + f), url('./app/icons/' + f));
 

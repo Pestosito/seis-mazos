@@ -16,7 +16,7 @@ Funciona sin conexión, salvo el juego en línea.
 
 ## Desarrollo
 
-- `src/` — código fuente (`engine.js` motor y estrategia, `app.js` interfaz y juego en línea, `styles.css`, `template.html`, `sw.js`, `manifest.webmanifest`, íconos y PeerJS en `vendor/`).
+- `src/` — código fuente (`engine.js` motor y estrategia, `app.js` interfaz y juego en línea, `styles.css`, `template.html`, `sw.js`, `manifest.webmanifest`, íconos y [MQTT.js](https://github.com/mqttjs/MQTT.js) en `vendor/`).
 - `app/` — app instalable generada; la rama `gh-pages` publica su contenido.
 
 ```sh
@@ -24,6 +24,7 @@ npm run build   # regenera app/
 npm test        # pruebas del motor
 ```
 
-El juego en línea conecta los teléfonos directamente (WebRTC) con [PeerJS](https://peerjs.com) (licencia MIT, en `src/vendor/`), usando su servidor público solo para presentarlos. No hay cuentas ni datos fuera del teléfono.
+
+El juego en línea no conecta los teléfonos entre sí: los mensajes pasan por servidores públicos de mensajería (MQTT sobre WebSocket seguro: EMQX, HiveMQ, Eclipse y Mosquitto) con [MQTT.js](https://github.com/mqttjs/MQTT.js) (licencia MIT, en `src/vendor/`). Así funciona con datos móviles y cualquier wifi. Los mensajes solo llevan jugadas y cartas; no hay cuentas, nombres ni datos personales.
 
 Las pruebas comparan las tablas con un cálculo independiente de valor esperado (mazo infinito); las únicas diferencias son A,4 vs 4 y A,2 vs 5, jugadas casi empatadas en las que la tabla de 4–8 mazos dobla.

@@ -1,10 +1,10 @@
 /* Seis Mazos — service worker: guarda la app para usarla sin conexión. */
-const CACHE = 'seis-mazos-9cbbfe34';
+const CACHE = 'seis-mazos-ae2e6047';
 const FONTS = 'seis-mazos-fonts';
 const ASSETS = [
   './',
   'index.html',
-  'peerjs.min.js',
+  'mqtt.min.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
