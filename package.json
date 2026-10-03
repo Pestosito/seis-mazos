@@ -1,0 +1,9 @@
+{
+  "name": "seis-mazos",
+  "private": true,
+  "description": "Entrenador de blackjack: estrategia básica, conteo Hi-Lo y desviaciones",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/engine.test.js"
+  }
+}

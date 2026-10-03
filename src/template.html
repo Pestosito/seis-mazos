@@ -1,0 +1,266 @@
+<title>Blackjack Seis Mazos</title>
+<!--__HEAD__-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Cinzel:wght@600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/*__CSS__*/
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Seis Mazos</h1>
+      <span>Estrategia básica · conteo Hi-Lo · desviaciones</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button class="tab" role="tab" id="tab-mesa" data-tab="mesa" aria-controls="view-mesa" aria-selected="true">Mesa</button>
+      <button class="tab" role="tab" id="tab-estrategia" data-tab="estrategia" aria-controls="view-estrategia" aria-selected="false">Estrategia</button>
+      <button class="tab" role="tab" id="tab-conteo" data-tab="conteo" aria-controls="view-conteo" aria-selected="false">Conteo</button>
+      <button class="tab" role="tab" id="tab-desviaciones" data-tab="desviaciones" aria-controls="view-desviaciones" aria-selected="false">Desviaciones</button>
+      <button class="tab" role="tab" id="tab-tablas" data-tab="tablas" aria-controls="view-tablas" aria-selected="false">Tablas</button>
+      <button class="tab" role="tab" id="tab-reglas" data-tab="reglas" aria-controls="view-reglas" aria-selected="false">Reglas</button>
+    </nav>
+    <div class="bank"><button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
+  </header>
+
+  <main>
+    <!-- Mesa -->
+    <section id="view-mesa" role="tabpanel" aria-labelledby="tab-mesa">
+      <div class="mesa">
+        <div class="mesa-main">
+          <div class="felt" id="felt">
+            <div class="felt-top">
+              <div class="tray" title="Bandeja de descartes: estima con ella los mazos que quedan">
+                <div class="tray-box" id="tray"><div class="tray-stack" id="tray-stack"></div></div>
+                <span>Descartes</span>
+                <span class="tray-note" id="tray-note"></span>
+              </div>
+              <div class="dealer">
+                <div class="zone-label">CRUPIER <span class="pill" id="dealer-total" hidden></span></div>
+                <div class="cards" id="dealer-cards"></div>
+              </div>
+              <div class="shoe" title="Zapato: la línea roja es la carta de corte">
+                <div class="shoe-box" id="shoe"><div class="meter"><i id="shoe-fill"></i><b id="shoe-cut"></b></div></div>
+                <span>Zapato</span>
+                <span class="shoe-note" id="shoe-note"></span>
+              </div>
+            </div>
+            <svg class="print" viewBox="0 0 600 132" aria-hidden="true">
+              <defs>
+                <path id="arc-a" d="M 40 22 Q 300 98 560 22"/>
+                <path id="arc-b" d="M 78 50 Q 300 118 522 50"/>
+                <path id="arc-c" d="M 128 80 Q 300 140 472 80"/>
+              </defs>
+              <text class="p-big"><textPath href="#arc-a" startOffset="50%" text-anchor="middle" id="print-bj">BLACKJACK PAGA 3 A 2</textPath></text>
+              <text class="p-mid"><textPath href="#arc-b" startOffset="50%" text-anchor="middle" id="print-dealer">EL CRUPIER SE PLANTA EN TODOS LOS 17</textPath></text>
+              <path class="band" d="M 116 66 Q 300 126 484 66"/>
+              <path class="band" d="M 116 85 Q 300 146 484 85"/>
+              <text class="p-band"><textPath href="#arc-c" startOffset="50%" text-anchor="middle">EL SEGURO PAGA 2 A 1</textPath></text>
+            </svg>
+            <div class="seats" id="seats"></div>
+          </div>
+          <div class="dock">
+            <div class="status">
+              <span id="status-msg" aria-live="polite"></span>
+              <span class="rules-line" id="rules-line"></span>
+            </div>
+            <div class="controls" id="controls"></div>
+            <div class="table-opts" id="table-opts">
+              <span>Jugadores robot en la mesa</span>
+              <div class="seg" id="bots-seg" role="radiogroup" aria-label="Jugadores robot en la mesa"></div>
+              <span class="small muted" id="bots-note"></span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="panel" id="online-panel">
+            <h2>Jugar con alguien</h2>
+            <div class="online" id="online"></div>
+          </div>
+          <div class="panel" id="score-panel" hidden>
+            <h2 id="score-title">Marcador</h2>
+            <div class="chart-wrap" id="score"></div>
+          </div>
+          <div class="panel">
+            <h2>Conteo Hi-Lo</h2>
+            <div class="hud veiled" id="hud">
+              <div class="k"><span>Running</span><b id="hud-rc">0</b></div>
+              <div class="k"><span>True</span><b id="hud-tc">0.0</b></div>
+              <div class="k"><span>Mazos</span><b id="hud-decks">6.0</b></div>
+            </div>
+            <div class="hud-foot">
+              <span id="hud-extra">Cuenta tú; ábrelo para comprobar.</span>
+              <button class="btn small ghost" id="hud-toggle" type="button">Mostrar</button>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Tu última jugada</h2>
+            <div class="feedback" id="feedback" aria-live="polite"></div>
+          </div>
+          <div class="panel">
+            <h2>Sesión</h2>
+            <dl class="stat-grid" id="stats"></dl>
+          </div>
+          <div class="panel">
+            <h2>Errores recientes</h2>
+            <ul class="errlist" id="errors"></ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Ejercicio de estrategia básica -->
+    <section id="view-estrategia" role="tabpanel" aria-labelledby="tab-estrategia" hidden>
+      <div class="drill">
+        <div class="drill-main">
+          <div class="toolbar">
+            <div class="seg" id="sd-filter" role="radiogroup" aria-label="Tipo de mano"></div>
+            <label class="check"><input type="checkbox" id="sd-focus"> Repasar mis errores</label>
+            <label class="check"><input type="checkbox" id="sd-auto" checked> Pasar sola si aciertas</label>
+          </div>
+          <div class="felt mini hide-tags">
+            <div class="mini-row">
+              <div class="mini-col"><div class="zone-label">CRUPIER</div><div class="cards" id="sd-up"></div></div>
+              <div class="mini-col"><div class="zone-label">TÚ <span class="pill" id="sd-total"></span></div><div class="cards" id="sd-hand"></div></div>
+            </div>
+            <div class="prompt" id="sd-prompt">Primera decisión de la mano: ¿qué haces?</div>
+          </div>
+          <div class="controls" id="sd-actions"></div>
+          <div class="panel drill-fb"><div class="feedback" id="sd-fb" aria-live="polite"></div></div>
+        </div>
+        <aside class="side">
+          <div class="panel"><h2>Progreso</h2><dl class="stat-grid" id="sd-stats"></dl></div>
+          <div class="panel"><h2 id="sd-chart-title">Tabla</h2><div class="chart-wrap" id="sd-chart"></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Ejercicio de conteo -->
+    <section id="view-conteo" role="tabpanel" aria-labelledby="tab-conteo" hidden>
+      <div class="drill">
+        <div class="drill-main">
+          <div class="toolbar">
+            <div class="seg" id="cd-mode" role="radiogroup" aria-label="Ejercicio"></div>
+          </div>
+          <div class="toolbar" id="cd-opts">
+            <div class="seg" id="cd-n" role="radiogroup" aria-label="Cartas"></div>
+            <div class="seg" id="cd-group" role="radiogroup" aria-label="Cartas a la vez"></div>
+            <label class="range">Ritmo <input type="range" id="cd-speed" min="0.2" max="2" step="0.05" value="0.8"> <span id="cd-speed-out" class="num"></span></label>
+          </div>
+          <div class="felt mini hide-tags" id="cd-felt">
+            <div class="progress"><i id="cd-progress"></i></div>
+            <div class="flash" id="cd-flash"></div>
+            <div class="prompt" id="cd-prompt"></div>
+          </div>
+          <div class="controls" id="cd-actions"></div>
+          <div class="panel drill-fb"><div class="feedback" id="cd-fb" aria-live="polite"></div></div>
+        </div>
+        <aside class="side">
+          <div class="panel">
+            <h2>Valores Hi-Lo</h2>
+            <div class="hilo">
+              <div><span>2 3 4 5 6</span><b>+1</b></div>
+              <div><span>7 8 9</span><b>0</b></div>
+              <div><span>10 J Q K A</span><b>−1</b></div>
+            </div>
+            <p class="small muted">Un mazo completo suma 0. Meta habitual: contar un mazo en menos de 25 segundos sin fallar.</p>
+          </div>
+          <div class="panel"><h2>Historial</h2><ul class="errlist" id="cd-history"></ul></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Ejercicio de desviaciones -->
+    <section id="view-desviaciones" role="tabpanel" aria-labelledby="tab-desviaciones" hidden>
+      <div class="drill">
+        <div class="drill-main">
+          <div class="toolbar">
+            <div class="seg" id="dv-mode" role="radiogroup" aria-label="Modo"></div>
+            <div class="seg" id="dv-show" role="radiogroup" aria-label="Dato mostrado"></div>
+            <div class="seg" id="dv-set" role="radiogroup" aria-label="Grupo"></div>
+          </div>
+          <div class="felt mini hide-tags">
+            <div class="tc-badge num" id="dv-tc"></div>
+            <div class="mini-row">
+              <div class="mini-col"><div class="zone-label">CRUPIER</div><div class="cards" id="dv-up"></div></div>
+              <div class="mini-col"><div class="zone-label">TÚ <span class="pill" id="dv-total"></span></div><div class="cards" id="dv-hand"></div></div>
+            </div>
+            <div class="prompt" id="dv-prompt"></div>
+          </div>
+          <div class="controls" id="dv-actions"></div>
+          <div class="panel drill-fb"><div class="feedback" id="dv-fb" aria-live="polite"></div></div>
+        </div>
+        <aside class="side">
+          <div class="panel"><h2>Progreso</h2><dl class="stat-grid" id="dv-stats"></dl></div>
+          <div class="panel"><h2>Índices con tus reglas</h2><div class="chart-wrap" id="dv-list"></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Tablas -->
+    <section id="view-tablas" role="tabpanel" aria-labelledby="tab-tablas" hidden>
+      <div class="drill-main">
+        <div class="section-head">
+          <h2>Estrategia básica</h2>
+          <span class="muted small" id="tb-rules"></span>
+        </div>
+        <div class="toolbar">
+          <label class="check"><input type="checkbox" id="tb-ix" checked> Marcar los índices de desviación en cada casilla</label>
+        </div>
+        <div class="legend" id="tb-legend"></div>
+        <div class="charts" id="tb-charts"></div>
+        <div class="section-head"><h2>Desviaciones Hi-Lo</h2><span class="muted small">Illustrious 18 y Fab 4. Se aplican con true count igual o mayor que el índice.</span></div>
+        <div class="panel"><div class="chart-wrap" id="tb-devs"></div></div>
+        <div class="section-head"><h2>Cómo contar</h2></div>
+        <div class="guide" id="tb-guide"></div>
+      </div>
+    </section>
+
+    <!-- Reglas -->
+    <section id="view-reglas" role="tabpanel" aria-labelledby="tab-reglas" hidden>
+      <div class="settings">
+        <div class="panel">
+          <h2>Reglas de la mesa</h2>
+          <p class="notice" id="rules-lock" hidden></p>
+          <div id="rules-form"></div>
+        </div>
+        <div class="side">
+          <div class="panel">
+            <h2>Ventaja de la casa</h2>
+            <div class="edge"><b id="edge-val">0.34%</b><span class="muted small" id="edge-note"></span></div>
+            <p class="small muted" id="edge-text"></p>
+          </div>
+          <div class="panel">
+            <h2>Entrenamiento</h2>
+            <div id="train-form"></div>
+          </div>
+          <div class="panel" id="install-panel" hidden>
+            <h2>Instalar en el teléfono</h2>
+            <p class="small">Android (Chrome): menú <b>⋮</b> → <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>.</p>
+            <p class="small">iPhone (Safari): botón <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</p>
+            <p class="small muted">Queda un ícono como cualquier app y funciona sin internet, salvo el juego en línea.</p>
+          </div>
+          <div class="panel">
+            <h2>Mantenimiento</h2>
+            <div class="controls start">
+              <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
+              <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
+              <button class="btn small" type="button" id="btn-stats">Borrar estadísticas</button>
+              <button class="btn small" type="button" id="btn-defaults">Reglas por defecto</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!--__VENDOR__-->
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__APP__*/
+</script>
