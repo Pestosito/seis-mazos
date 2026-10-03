@@ -1255,6 +1255,10 @@ td .ix {
 table.chart.no-ix .ix {
   display: none;
 }
+td.h17diff {
+  outline: 2px dashed var(--ink);
+  outline-offset: -3px;
+}
 td.hl {
   outline: 3px solid var(--ink);
   outline-offset: -1px;
@@ -1547,6 +1551,28 @@ table.score tr.total td {
     flex-direction: column;
     gap: 3px;
   }
+  .charts .panel {
+    padding: 12px 10px;
+  }
+  table.chart {
+    border-spacing: 1px;
+    font-size: 0.72rem;
+  }
+  table.chart td {
+    min-width: 0;
+    padding: 5px 0;
+  }
+  table.chart th {
+    padding: 2px 3px;
+    font-size: 0.68rem;
+  }
+  table.chart tbody th {
+    padding-right: 4px;
+  }
+  td .ix {
+    font-size: 0.5rem;
+    right: 1px;
+  }
   .hand-meta .pill {
     font-size: 0.68rem;
   }
@@ -1780,6 +1806,7 @@ table.score tr.total td {
         <div class="toolbar">
           <label class="check"><input type="checkbox" id="tb-ix" checked> Marcar los índices de desviación en cada casilla</label>
         </div>
+        <p class="notice" id="tb-h17"></p>
         <div class="legend" id="tb-legend"></div>
         <div class="charts" id="tb-charts"></div>
         <div class="section-head"><h2>Desviaciones Hi-Lo</h2><span class="muted small">Illustrious 18 y Fab 4. Se aplican con true count igual o mayor que el índice.</span></div>
@@ -4328,7 +4355,12 @@ table.score tr.total td {
           row.cells.map((c) =>
             h(
               'td',
-              { class: `c-${c.code}${hl && hl.key === row.key && hl.up === c.up ? ' hl' : ''}`, title: CODE_TITLE[c.code] },
+              {
+                class: `c-${c.code}${hl && hl.key === row.key && hl.up === c.up ? ' hl' : ''}${
+                  opts && opts.marks && opts.marks.has(`${opts.kind}:${row.key}:${c.up}`) ? ' h17diff' : ''
+                }`,
+                title: CODE_TITLE[c.code],
+              },
               CODE_LABEL[c.code],
               c.devs && c.devs.length
                 ? h('span', { class: 'ix' }, c.devs.map((d) => (d.kind === 'sur' ? 'R' : '') + signed(d.index)).join(' '))
@@ -4903,11 +4935,29 @@ table.score tr.total td {
       ...legendItems.map(([c, t]) => h('span', null, h('i', { class: 'c-' + c, style: `background:var(--a-${actionVar(c)})` }, CODE_LABEL[c]), t)),
       noIx ? null : h('span', null, h('i', { style: 'background:var(--panel-2);color:var(--ink)' }, '+4'), 'índice de desviación (R = rendirse)'),
     );
-    const block = (title, rows, corner) =>
-      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(rows, { noIx, corner })));
+    // Casillas que cambian según el crupier pida o se plante con 17 blando.
+    const other = BJ.strategyCharts(Object.assign({}, r, { h17: !r.h17 }));
+    const marks = new Set();
+    const changes = [];
+    for (const kind of ['hard', 'soft', 'pairs'])
+      charts[kind].forEach((row, i) =>
+        row.cells.forEach((c, j) => {
+          const alt = other[kind][i].cells[j].code;
+          if (alt === c.code) return;
+          marks.add(`${kind}:${row.key}:${c.up}`);
+          const s17 = r.h17 ? alt : c.code;
+          const h17 = r.h17 ? c.code : alt;
+          changes.push(`${row.label} vs ${BJ.upLabel(c.up)}: ${CODE_TITLE[s17].split(' (')[0]} → ${CODE_TITLE[h17].split(' (')[0]}`);
+        }),
+      );
+    $('tb-h17').textContent = r.h17
+      ? `El crupier pide con 17 blando (H17). Las casillas marcadas cambian respecto a S17: ${changes.join(' · ')}.`
+      : `El crupier se planta con 17 blando (S17). Las casillas marcadas cambiarían con H17: ${changes.join(' · ')}.`;
+    const block = (title, kind, corner) =>
+      h('div', { class: 'panel' }, h('h3', null, title), h('div', { class: 'chart-wrap' }, chartTable(charts[kind], { noIx, corner, marks, kind })));
     $('tb-charts').replaceChildren(
-      block('Manos duras', charts.hard, 'Total'),
-      h('div', { class: 'side' }, block('Manos blandas', charts.soft, 'Mano'), block('Parejas', charts.pairs, 'Pareja')),
+      block('Manos duras', 'hard', 'Total'),
+      h('div', { class: 'side' }, block('Manos blandas', 'soft', 'Mano'), block('Parejas', 'pairs', 'Pareja')),
     );
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
