@@ -685,13 +685,12 @@
     );
   }
 
-  const extraSur = (r) => r.h17 && r.surrender === 'late' && r.h17ExtraSurrender;
   function rulesSummary(r) {
     return [
       `${r.decks} mazos`,
       r.h17 ? 'H17' : 'S17',
       r.das ? 'DAS' : 'sin DAS',
-      r.surrender === 'late' ? (extraSur(r) ? 'rendición (+ extras H17)' : 'rendición') : 'sin rendición',
+      r.surrender === 'late' ? 'rendición' : 'sin rendición',
       `separar hasta ${r.maxHands}`,
       r.resplitAces ? 'RSA' : 'sin RSA',
       r.doubleOn === 'any' ? 'doblar 2 cartas' : `doblar ${r.doubleOn}`,
@@ -2541,7 +2540,14 @@
             'div',
             { class: 'panel' },
             h('h3', null, CHART_TITLE.surrender),
-            h('div', { class: 'chart-wrap' }, chartTable(charts.surrender, { noIx, corner: 'Total', marks, kind: 'surrender' })),
+            h(
+              'div',
+              { class: 'chart-wrap' },
+              chartTable(
+                charts.surrender.filter((row) => !(row.optional && noIx)),
+                { noIx, corner: 'Total', marks, kind: 'surrender' },
+              ),
+            ),
             h('p', { class: 'small muted' }, 'Solo con las dos primeras cartas. Si no se puede rendir, se juega lo que dicen las otras tablas.'),
           )
         : null,
@@ -2632,12 +2638,6 @@
     { key: 'hitSplitAces', label: 'Pedir con ases separados', hint: 'Lo normal es una sola carta por as.', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'doubleOn', label: 'Doblar con', options: [['any', 'Dos cartas cualesquiera'], ['9-11', '9, 10, 11'], ['10-11', '10 y 11']] },
     { key: 'surrender', label: 'Rendición', hint: 'Tardía: después de que el crupier revisa si tiene blackjack.', options: [['late', 'Tardía'], ['none', 'No']] },
-    {
-      key: 'h17ExtraSurrender',
-      label: 'Con H17, rendirse también con 15 y 17 vs A y 8,8 vs A',
-      hint: 'La tabla de Blackjack Apprenticeship no las incluye. Según Wizard of Odds son un poco mejores.',
-      options: [[false, 'No'], [true, 'Sí']],
-    },
     { key: 'bjPays', label: 'Blackjack paga', options: [[1.5, '3 a 2'], [1.2, '6 a 5']] },
     {
       key: 'penetration',

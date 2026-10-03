@@ -82,21 +82,19 @@ test('estrategia básica: cambios con H17', () => {
   assert.equal(a(['8', '3'], 11), 'D');
   assert.equal(a(['A', '8'], 6), 'D');
   assert.equal(a(['A', '7'], 2), 'D');
-  // Como la tabla H17 de Blackjack Apprenticeship: sin rendiciones extra contra As
-  assert.equal(a(['10', '5'], 11), 'H');
-  assert.equal(a(['10', '7'], 11), 'S');
-  assert.equal(a(['8', '8'], 11), 'P');
-  // Con la opción de rendiciones extra (tablas de Wizard of Odds)
-  const x = R({ h17: true, h17ExtraSurrender: true });
-  assert.equal(a(['10', '5'], 11, FULL, x), 'R');
-  assert.equal(a(['10', '7'], 11, FULL, x), 'R');
-  assert.equal(a(['8', '8'], 11, FULL, x), 'R');
-  assert.equal(a(['8', '8'], 11, NO_SUR, x), 'P');
+  // Rendición tardía con H17 (tabla de Blackjack Apprenticeship 2024)
+  assert.equal(a(['10', '5'], 11), 'R');
+  assert.equal(a(['10', '7'], 11), 'R');
+  assert.equal(a(['8', '8'], 11), 'R');
+  assert.equal(a(['8', '8'], 11, NO_SUR), 'P');
+  assert.equal(a(['10', '5'], 11, NO_SUR), 'H');
+  assert.equal(a(['10', '7'], 11, NO_SUR), 'S');
 });
 
 /*
- * Tabla H17 de Blackjack Apprenticeship (4–8 mazos, DAS, rendición tardía), transcrita casilla
- * por casilla. Columnas: 2 3 4 5 6 7 8 9 10 A. En parejas, "y" significa separar solo con DAS.
+ * Tabla «H17 Basic Strategy» de Blackjack Apprenticeship (2024; 4–8 mazos, DAS, rendición tardía),
+ * transcrita casilla por casilla del PDF. Columnas: 2 3 4 5 6 7 8 9 10 A.
+ * En parejas, "y" significa separar solo con DAS.
  */
 const BJA_H17 = {
   pairs: {
@@ -133,7 +131,7 @@ const BJA_H17 = {
     9: 'HDDDDHHHHH',
     8: 'HHHHHHHHHH',
   },
-  surrender: { 16: '.......RRR', 15: '........R.', 14: '..........' },
+  surrender: { 17: '.........R', 16: '.......RRR', 15: '........RR', 14: '..........', p8: '.........R' },
 };
 const cellsOf = (row) => row.cells.map((c) => c.code);
 
@@ -157,12 +155,17 @@ test('tablas idénticas a la tabla H17 de Blackjack Apprenticeship', () => {
   checkAgainstBJA(R({ h17: true, das: false }), BJA_H17);
 });
 
-test('con S17 solo cambian 11 vs A, A,7 vs 2 y A,8 vs 6', () => {
+test('con S17 cambian 11 vs A, A,7 vs 2, A,8 vs 6 y las rendiciones contra As', () => {
   const s17 = JSON.parse(JSON.stringify(BJA_H17));
   s17.hard[11] = 'DDDDDDDDDH';
   s17.soft[19][4] = 'S';
   s17.soft[18][0] = 'S';
+  s17.surrender = { 16: '.......RRR', 15: '........R.', 14: '..........' };
   checkAgainstBJA(R(), s17);
+});
+
+test('sin rendición no hay cuadro de rendición', () => {
+  assert.deepEqual(BJ.strategyCharts(R({ h17: true, surrender: 'none' })).surrender, []);
 });
 
 test('estrategia básica: sin DAS', () => {
@@ -232,12 +235,9 @@ test('desviaciones con H17', () => {
   const ids = BJ.deviationList(r).map((x) => x.id);
   assert.ok(!ids.includes('11vA'));
   assert.equal(BJ.deviationList(r).find((x) => x.id === '10vA').index, 3);
-  // Sin rendiciones extra, 15 vs A se rinde con el índice de S17 (+1)
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, 0.5, true).action, 'H');
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, 1, true).action, 'R');
-  const x = R({ h17: true, h17ExtraSurrender: true });
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, x, -1.5, true).action, 'H');
-  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, x, -1, true).action, 'R');
+  // Con H17, 15 vs A se rinde por básica; solo con TC < −1 conviene pedir
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, -1.5, true).action, 'H');
+  assert.equal(BJ.decide(hand('10', '5'), 11, FULL, r, -1, true).action, 'R');
 });
 
 test('corrección con tolerancia por estimación de mazos', () => {
@@ -433,7 +433,7 @@ const KNOWN = new Set(['soft A,4 v 4: tabla D, EV H', 'soft A,2 v 5: tabla D, EV
 
 for (const [name, rules] of [
   ['S17 DAS LS', R()],
-  ['H17 DAS LS (rendiciones extra)', R({ h17: true, h17ExtraSurrender: true })],
+  ['H17 DAS LS', R({ h17: true })],
   ['S17 noDAS sin rendición', R({ das: false, surrender: 'none' })],
   ['H17 noDAS sin rendición', R({ h17: true, das: false, surrender: 'none' })],
 ]) {

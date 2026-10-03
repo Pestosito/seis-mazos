@@ -1920,7 +1920,7 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">d50d70f5</span></p>
+            <p class="small muted">Versión <span class="num">ac83f7b2</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
@@ -1965,9 +1965,6 @@ table.score tr.total td {
     hitSplitAces: false,
     doubleOn: 'any', // 'any' | '9-11' | '10-11'
     surrender: 'late', // 'none' | 'late'
-    // Con H17, rendirse también con 15 y 17 contra As y con 8,8 contra As (tablas de Wizard of Odds).
-    // La tabla H17 de Blackjack Apprenticeship no las incluye, así que por defecto están desactivadas.
-    h17ExtraSurrender: false,
     bjPays: 1.5, // 1.5 = 3:2, 1.2 = 6:5
     penetration: 0.75,
   };
@@ -2149,8 +2146,10 @@ table.score tr.total td {
 
   // Códigos: H pedir, S plantarse, D doblar (si no, pedir), Ds doblar (si no, plantarse),
   // Rh rendirse (si no, pedir), Rs rendirse (si no, plantarse).
+  // Con H17 la rendición tardía también incluye 17 vs A, 15 vs A y 8,8 vs A
+  // (tabla H17 de Blackjack Apprenticeship 2024 y Wizard of Odds).
   function extraH17Surrender(r) {
-    return r.surrender === 'late' && r.h17 && !!r.h17ExtraSurrender;
+    return r.surrender === 'late' && r.h17;
   }
 
   function hardCode(total, up, r) {
@@ -2483,8 +2482,10 @@ table.score tr.total td {
           code: isR(hardCode(total, up, r)) ? 'R' : '',
           devs: devAt((d) => d.kind === 'sur' && d.total === total && d.up === up),
         }));
-        if (total === 17 && !cells.some((c) => c.code)) continue;
-        surrender.push({ label: String(total), key: total, cells });
+        const empty = !cells.some((c) => c.code);
+        if (total === 17 && empty) continue;
+        // La fila 14 no tiene rendiciones básicas; solo sirve para mostrar el índice de desviación.
+        surrender.push({ label: String(total), key: total, cells, optional: empty });
       }
       const p8 = UPCARDS.map((up) => ({ up, code: pairCode(8, up, r) === 'Rp' ? 'R' : '', devs: [] }));
       if (p8.some((c) => c.code)) surrender.push({ label: '8,8', key: 'p8', cells: p8 });
@@ -3365,13 +3366,12 @@ table.score tr.total td {
     );
   }
 
-  const extraSur = (r) => r.h17 && r.surrender === 'late' && r.h17ExtraSurrender;
   function rulesSummary(r) {
     return [
       `${r.decks} mazos`,
       r.h17 ? 'H17' : 'S17',
       r.das ? 'DAS' : 'sin DAS',
-      r.surrender === 'late' ? (extraSur(r) ? 'rendición (+ extras H17)' : 'rendición') : 'sin rendición',
+      r.surrender === 'late' ? 'rendición' : 'sin rendición',
       `separar hasta ${r.maxHands}`,
       r.resplitAces ? 'RSA' : 'sin RSA',
       r.doubleOn === 'any' ? 'doblar 2 cartas' : `doblar ${r.doubleOn}`,
@@ -5221,7 +5221,14 @@ table.score tr.total td {
             'div',
             { class: 'panel' },
             h('h3', null, CHART_TITLE.surrender),
-            h('div', { class: 'chart-wrap' }, chartTable(charts.surrender, { noIx, corner: 'Total', marks, kind: 'surrender' })),
+            h(
+              'div',
+              { class: 'chart-wrap' },
+              chartTable(
+                charts.surrender.filter((row) => !(row.optional && noIx)),
+                { noIx, corner: 'Total', marks, kind: 'surrender' },
+              ),
+            ),
             h('p', { class: 'small muted' }, 'Solo con las dos primeras cartas. Si no se puede rendir, se juega lo que dicen las otras tablas.'),
           )
         : null,
@@ -5312,12 +5319,6 @@ table.score tr.total td {
     { key: 'hitSplitAces', label: 'Pedir con ases separados', hint: 'Lo normal es una sola carta por as.', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'doubleOn', label: 'Doblar con', options: [['any', 'Dos cartas cualesquiera'], ['9-11', '9, 10, 11'], ['10-11', '10 y 11']] },
     { key: 'surrender', label: 'Rendición', hint: 'Tardía: después de que el crupier revisa si tiene blackjack.', options: [['late', 'Tardía'], ['none', 'No']] },
-    {
-      key: 'h17ExtraSurrender',
-      label: 'Con H17, rendirse también con 15 y 17 vs A y 8,8 vs A',
-      hint: 'La tabla de Blackjack Apprenticeship no las incluye. Según Wizard of Odds son un poco mejores.',
-      options: [[false, 'No'], [true, 'Sí']],
-    },
     { key: 'bjPays', label: 'Blackjack paga', options: [[1.5, '3 a 2'], [1.2, '6 a 5']] },
     {
       key: 'penetration',

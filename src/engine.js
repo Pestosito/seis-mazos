@@ -27,9 +27,6 @@
     hitSplitAces: false,
     doubleOn: 'any', // 'any' | '9-11' | '10-11'
     surrender: 'late', // 'none' | 'late'
-    // Con H17, rendirse también con 15 y 17 contra As y con 8,8 contra As (tablas de Wizard of Odds).
-    // La tabla H17 de Blackjack Apprenticeship no las incluye, así que por defecto están desactivadas.
-    h17ExtraSurrender: false,
     bjPays: 1.5, // 1.5 = 3:2, 1.2 = 6:5
     penetration: 0.75,
   };
@@ -211,8 +208,10 @@
 
   // Códigos: H pedir, S plantarse, D doblar (si no, pedir), Ds doblar (si no, plantarse),
   // Rh rendirse (si no, pedir), Rs rendirse (si no, plantarse).
+  // Con H17 la rendición tardía también incluye 17 vs A, 15 vs A y 8,8 vs A
+  // (tabla H17 de Blackjack Apprenticeship 2024 y Wizard of Odds).
   function extraH17Surrender(r) {
-    return r.surrender === 'late' && r.h17 && !!r.h17ExtraSurrender;
+    return r.surrender === 'late' && r.h17;
   }
 
   function hardCode(total, up, r) {
@@ -545,8 +544,10 @@
           code: isR(hardCode(total, up, r)) ? 'R' : '',
           devs: devAt((d) => d.kind === 'sur' && d.total === total && d.up === up),
         }));
-        if (total === 17 && !cells.some((c) => c.code)) continue;
-        surrender.push({ label: String(total), key: total, cells });
+        const empty = !cells.some((c) => c.code);
+        if (total === 17 && empty) continue;
+        // La fila 14 no tiene rendiciones básicas; solo sirve para mostrar el índice de desviación.
+        surrender.push({ label: String(total), key: total, cells, optional: empty });
       }
       const p8 = UPCARDS.map((up) => ({ up, code: pairCode(8, up, r) === 'Rp' ? 'R' : '', devs: [] }));
       if (p8.some((c) => c.code)) surrender.push({ label: '8,8', key: 'p8', cells: p8 });
