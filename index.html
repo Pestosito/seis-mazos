@@ -3,8 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-</head>
-<body>
 <title>Blackjack Seis Mazos</title>
 <meta name="description" content="Practica blackjack: estrategia básica, conteo Hi-Lo y desviaciones, solo o con otra persona.">
 <meta name="theme-color" content="#0c4636">
@@ -1491,6 +1489,32 @@ table.score tr.total td {
   font-weight: 700;
   border-top: 2px solid var(--line);
 }
+.install-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 48px 10px 14px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.install-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 0.88rem;
+}
+#install-banner-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 4px 9px;
+}
 #install-btn {
   margin-right: 6px;
 }
@@ -1546,7 +1570,8 @@ table.score tr.total td {
 }
 
 </style>
-
+</head>
+<body>
 <div class="app" id="app">
   <header class="top">
     <div class="brand">
@@ -1563,6 +1588,12 @@ table.score tr.total td {
     </nav>
     <div class="bank"><button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
   </header>
+
+  <div class="install-banner" id="install-banner" hidden>
+    <div class="install-text"><b>Instala Seis Mazos en tu teléfono</b><span id="install-how"></span></div>
+    <button class="btn small primary" type="button" id="install-banner-btn" hidden>Instalar</button>
+    <button class="btn small ghost" type="button" id="install-banner-close" aria-label="Cerrar aviso">✕</button>
+  </div>
 
   <main>
     <!-- Mesa -->
@@ -5162,17 +5193,52 @@ table.score tr.total td {
   const isStandalone = () =>
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 
+  // Cómo instalar según el teléfono y el navegador en que se abrió el enlace.
+  function installHint() {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua);
+    const android = /Android/.test(ua);
+    if (/FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)|GSA\//.test(ua))
+      return 'Lo abriste dentro de otra app. Ábrelo en el navegador: toca ⋮ o ··· y elige «Abrir en el navegador» (Chrome o Safari).';
+    if (ios) return 'Toca el botón Compartir (el cuadrado con la flecha ↑) y baja hasta «Añadir a pantalla de inicio».';
+    if (android) return 'Toca «Instalar» o, en Chrome, el menú ⋮ → «Instalar app» o «Añadir a pantalla de inicio».';
+    return '';
+  }
+  const INSTALL_DISMISSED = 'seis-mazos-install-dismissed';
+
   // Solo en la versión instalable (la que sirve sw.js y el manifiesto).
   function setupInstall() {
     if (!window.SEIS_MAZOS_PWA) return;
-    $('install-panel').hidden = isStandalone();
+    const standalone = isStandalone();
+    $('install-panel').hidden = standalone;
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(INSTALL_DISMISSED) === '1';
+    } catch (e) {
+      /* sin almacenamiento */
+    }
+    const how = installHint();
+    if (!standalone && !dismissed && how) {
+      $('install-how').textContent = how;
+      $('install-banner').hidden = false;
+    }
+    $('install-banner-close').addEventListener('click', () => {
+      $('install-banner').hidden = true;
+      try {
+        localStorage.setItem(INSTALL_DISMISSED, '1');
+      } catch (e) {
+        /* sin almacenamiento */
+      }
+    });
     let deferred = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferred = e;
       $('install-btn').hidden = false;
+      $('install-banner-btn').hidden = false;
     });
+    $('install-banner-btn').addEventListener('click', () => $('install-btn').click());
     // iPhone no avisa para instalar: el botón lleva a las instrucciones.
     if (!isStandalone() && /iPhone|iPad|iPod/.test(navigator.userAgent)) $('install-btn').hidden = false;
     $('install-btn').addEventListener('click', async () => {
@@ -5189,10 +5255,12 @@ table.score tr.total td {
       }
       deferred = null;
       $('install-btn').hidden = true;
+      $('install-banner-btn').hidden = true;
     });
     window.addEventListener('appinstalled', () => {
       $('install-btn').hidden = true;
       $('install-panel').hidden = true;
+      $('install-banner').hidden = true;
     });
   }
 
@@ -5315,6 +5383,5 @@ table.score tr.total td {
 })();
 
 </script>
-
 </body>
 </html>
