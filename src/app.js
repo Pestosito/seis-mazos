@@ -2641,17 +2641,52 @@
   const isStandalone = () =>
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 
+  // Cómo instalar según el teléfono y el navegador en que se abrió el enlace.
+  function installHint() {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua);
+    const android = /Android/.test(ua);
+    if (/FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)|GSA\//.test(ua))
+      return 'Lo abriste dentro de otra app. Ábrelo en el navegador: toca ⋮ o ··· y elige «Abrir en el navegador» (Chrome o Safari).';
+    if (ios) return 'Toca el botón Compartir (el cuadrado con la flecha ↑) y baja hasta «Añadir a pantalla de inicio».';
+    if (android) return 'Toca «Instalar» o, en Chrome, el menú ⋮ → «Instalar app» o «Añadir a pantalla de inicio».';
+    return '';
+  }
+  const INSTALL_DISMISSED = 'seis-mazos-install-dismissed';
+
   // Solo en la versión instalable (la que sirve sw.js y el manifiesto).
   function setupInstall() {
     if (!window.SEIS_MAZOS_PWA) return;
-    $('install-panel').hidden = isStandalone();
+    const standalone = isStandalone();
+    $('install-panel').hidden = standalone;
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(INSTALL_DISMISSED) === '1';
+    } catch (e) {
+      /* sin almacenamiento */
+    }
+    const how = installHint();
+    if (!standalone && !dismissed && how) {
+      $('install-how').textContent = how;
+      $('install-banner').hidden = false;
+    }
+    $('install-banner-close').addEventListener('click', () => {
+      $('install-banner').hidden = true;
+      try {
+        localStorage.setItem(INSTALL_DISMISSED, '1');
+      } catch (e) {
+        /* sin almacenamiento */
+      }
+    });
     let deferred = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferred = e;
       $('install-btn').hidden = false;
+      $('install-banner-btn').hidden = false;
     });
+    $('install-banner-btn').addEventListener('click', () => $('install-btn').click());
     // iPhone no avisa para instalar: el botón lleva a las instrucciones.
     if (!isStandalone() && /iPhone|iPad|iPod/.test(navigator.userAgent)) $('install-btn').hidden = false;
     $('install-btn').addEventListener('click', async () => {
@@ -2668,10 +2703,12 @@
       }
       deferred = null;
       $('install-btn').hidden = true;
+      $('install-banner-btn').hidden = true;
     });
     window.addEventListener('appinstalled', () => {
       $('install-btn').hidden = true;
       $('install-panel').hidden = true;
+      $('install-banner').hidden = true;
     });
   }
 

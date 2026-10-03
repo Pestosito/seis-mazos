@@ -1469,6 +1469,32 @@ table.score tr.total td {
   font-weight: 700;
   border-top: 2px solid var(--line);
 }
+.install-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 48px 10px 14px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.install-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 0.88rem;
+}
+#install-banner-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 4px 9px;
+}
 #install-btn {
   margin-right: 6px;
 }

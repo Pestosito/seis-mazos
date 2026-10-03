@@ -16,17 +16,23 @@ function page({ head = '', vendor = '' } = {}) {
     .replace('/*__ENGINE__*/', () => read('./src/engine.js'))
     .replace('/*__APP__*/', () => read('./src/app.js'));
 }
-const doc = (body) => `<!doctype html>
+// Documento completo: título, metadatos, manifiesto y estilos van en <head> (Chrome y Safari
+// solo leen ahí el manifiesto y el ícono); el resto de la página va en <body>.
+const doc = (page) => {
+  const cut = page.indexOf('<div class="app"');
+  return `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+${page.slice(0, cut).trim()}
 </head>
 <body>
-${body}
+${page.slice(cut).trim()}
 </body>
 </html>
 `;
+};
 
 mkdirSync(url('./dist/'), { recursive: true });
 const fragment = page();

@@ -1,5 +1,5 @@
 /* Seis Mazos — service worker: guarda la app para usarla sin conexión. */
-const CACHE = 'seis-mazos-a8d57c4ea8';
+const CACHE = 'seis-mazos-346ec3c8f4';
 const FONTS = 'seis-mazos-fonts';
 const ASSETS = [
   './',
