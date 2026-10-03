@@ -1317,6 +1317,18 @@ td.h17diff {
   outline: 2px dashed var(--ink);
   outline-offset: -3px;
 }
+td.h17diff.pulse {
+  animation: cellpulse 0.8s ease-in-out 4;
+}
+@keyframes cellpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--brass);
+  }
+}
 td.hl {
   outline: 3px solid var(--ink);
   outline-offset: -1px;
@@ -1644,7 +1656,8 @@ table.score tr.total td {
 @media (prefers-reduced-motion: reduce) {
   .card.deal-in,
   .card.flip,
-  .flash-fb.pop {
+  .flash-fb.pop,
+  td.h17diff.pulse {
     animation: none;
   }
   .btn,
@@ -1907,7 +1920,7 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">ae2e6047</span></p>
+            <p class="small muted">Versión <span class="num">d50d70f5</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
@@ -5146,6 +5159,7 @@ table.score tr.total td {
       settings.rules.h17 = v;
       buildForm('rules-form', RULE_FIELDS, settings.rules, onRuleChange);
       renderOnline();
+      T.tbScroll = true;
       onRuleChange('h17');
     });
     document.querySelectorAll('#tb-h17-seg input').forEach((i) => (i.disabled = NET.role === 'guest'));
@@ -5218,6 +5232,17 @@ table.score tr.total td {
         h('p', null, h('b', null, 'No tomarlos.'), settings.training.useDeviations ? ' Si cuentas cartas: tómalos solo con true count +3 o más.' : ''),
       ),
     );
+    // Tras cambiar S17/H17, las casillas que cambian parpadean (al abrir la pestaña si se cambió en Reglas).
+    if (T.tbPulse) {
+      T.tbPulse = false;
+      const changed = [...document.querySelectorAll('#tb-charts td.h17diff')];
+      for (const td of changed) {
+        td.classList.add('pulse');
+        td.addEventListener('animationend', () => td.classList.remove('pulse'), { once: true });
+      }
+      if (T.tbScroll && changed.length) changed[0].scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+      T.tbScroll = false;
+    }
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
   }
@@ -5384,6 +5409,7 @@ table.score tr.total td {
   }
 
   function onRuleChange(key) {
+    if (key === 'h17') T.tbPulse = true;
     if (key === 'decks' || key === 'penetration') {
       T.needShuffle = true;
       if (T.betCollector) {

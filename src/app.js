@@ -2479,6 +2479,7 @@
       settings.rules.h17 = v;
       buildForm('rules-form', RULE_FIELDS, settings.rules, onRuleChange);
       renderOnline();
+      T.tbScroll = true;
       onRuleChange('h17');
     });
     document.querySelectorAll('#tb-h17-seg input').forEach((i) => (i.disabled = NET.role === 'guest'));
@@ -2551,6 +2552,17 @@
         h('p', null, h('b', null, 'No tomarlos.'), settings.training.useDeviations ? ' Si cuentas cartas: tómalos solo con true count +3 o más.' : ''),
       ),
     );
+    // Tras cambiar S17/H17, las casillas que cambian parpadean (al abrir la pestaña si se cambió en Reglas).
+    if (T.tbPulse) {
+      T.tbPulse = false;
+      const changed = [...document.querySelectorAll('#tb-charts td.h17diff')];
+      for (const td of changed) {
+        td.classList.add('pulse');
+        td.addEventListener('animationend', () => td.classList.remove('pulse'), { once: true });
+      }
+      if (T.tbScroll && changed.length) changed[0].scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+      T.tbScroll = false;
+    }
     $('tb-devs').replaceChildren(devTable(BJ.deviationList(r), false));
     renderGuide();
   }
@@ -2717,6 +2729,7 @@
   }
 
   function onRuleChange(key) {
+    if (key === 'h17') T.tbPulse = true;
     if (key === 'decks' || key === 'penetration') {
       T.needShuffle = true;
       if (T.betCollector) {

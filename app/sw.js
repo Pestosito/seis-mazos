@@ -1,5 +1,5 @@
 /* Seis Mazos — service worker: guarda la app para usarla sin conexión. */
-const CACHE = 'seis-mazos-ae2e6047';
+const CACHE = 'seis-mazos-d50d70f5';
 const FONTS = 'seis-mazos-fonts';
 const ASSETS = [
   './',
@@ -16,7 +16,8 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.addAll(ASSETS))
+      // 'reload': no tomar copias viejas de la caché del navegador al instalar una versión nueva.
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -36,9 +37,10 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin === self.location.origin) {
     if (req.mode === 'navigate') {
-      // Primero la red, para recibir actualizaciones; sin conexión, la copia guardada.
+      // Primero la red (revalidando siempre: GitHub Pages pide guardar 10 minutos), para recibir
+      // actualizaciones; sin conexión, la copia guardada.
       e.respondWith(
-        fetch(req)
+        fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
           .then((res) => {
             if (res.ok) {
               const copy = res.clone();

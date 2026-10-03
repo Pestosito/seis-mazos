@@ -1297,6 +1297,18 @@ td.h17diff {
   outline: 2px dashed var(--ink);
   outline-offset: -3px;
 }
+td.h17diff.pulse {
+  animation: cellpulse 0.8s ease-in-out 4;
+}
+@keyframes cellpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--brass);
+  }
+}
 td.hl {
   outline: 3px solid var(--ink);
   outline-offset: -1px;
@@ -1624,7 +1636,8 @@ table.score tr.total td {
 @media (prefers-reduced-motion: reduce) {
   .card.deal-in,
   .card.flip,
-  .flash-fb.pop {
+  .flash-fb.pop,
+  td.h17diff.pulse {
     animation: none;
   }
   .btn,
