@@ -2,7 +2,12 @@
 
 Entrenador de blackjack: estrategia básica, conteo Hi-Lo y desviaciones. Se juega solo o en línea con otras personas, cada una en su teléfono.
 
-**Jugar:** abre la página de GitHub Pages de este repositorio en el teléfono y elige *Instalar app* (Android) o *Compartir → Añadir a pantalla de inicio* (iPhone). Funciona sin conexión, salvo el juego en línea.
+**Jugar:** abre **https://pestosito.github.io/seis-mazos/** en el navegador del teléfono (Safari en iPhone, Chrome en Android), no dentro de la app de GitHub.
+
+- **iPhone (Safari):** botón Compartir (el cuadrado con la flecha ↑) → *Añadir a pantalla de inicio*.
+- **Android (Chrome):** botón *Instalar* o menú ⋮ → *Instalar app*.
+
+Funciona sin conexión, salvo el juego en línea.
 
 - **Mesa**: zapato de 4, 6 u 8 mazos con carta de corte y jugadores robot que juegan estrategia básica. Cada decisión se corrige con la estrategia básica de las reglas elegidas y, si se activa, con las desviaciones Hi-Lo según el true count.
 - **Jugar con alguien**: quien crea la mesa comparte un código de 4 letras; hasta 3 personas más se unen desde su teléfono. Modo **coop** (banca común) o **individual** (cada uno con su banca).
