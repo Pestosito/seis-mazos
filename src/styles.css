@@ -896,6 +896,7 @@ button.chip:active {
 }
 .table-opts {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
@@ -904,6 +905,13 @@ button.chip:active {
   border-top: 1px solid var(--line);
   font-size: 0.85rem;
   color: var(--muted);
+}
+.table-opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
 }
 .quiz {
   display: flex;

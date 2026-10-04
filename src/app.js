@@ -70,6 +70,7 @@
     quiz: 'every5',
     quizTC: true,
     showTags: false,
+    showTotals: true,
     showDecks: false,
     gradeBets: true,
     unit: 25,
@@ -345,6 +346,7 @@
 
   // Mensaje de estado; `per` permite un texto distinto para cada jugador.
   function setMsg(m, per) {
+    if (m) T.turn = null;
     T.msg = m;
     T.msgFor = per || {};
     if (NET.role !== 'guest') renderTable();
@@ -450,6 +452,8 @@
       rc: T.rc,
       msg: T.msg,
       msgFor: T.msgFor,
+      over: !!T.over,
+      turn: T.turn || null,
       rules: settings.rules,
       unit: settings.training.unit,
       maxSpread: settings.training.maxSpread,
@@ -476,14 +480,22 @@
     syncCards($('dealer-cards'), m.dealer);
     const dt = $('dealer-total');
     const visible = m.dealer.filter((c) => !c.down);
-    dt.hidden = !m.dealer.length;
+    T.paintOver = !!m.over;
+    dt.hidden = !m.dealer.length || !(settings.training.showTotals || m.over);
     if (visible.length) dt.textContent = totalText(visible);
     syncChildren($('seats'), m.seats.map(seatNode));
     renderShoe(m);
     renderHud(m);
-    $('status-msg').textContent = (m.msgFor && m.msgFor[myId()]) || m.msg || '';
+    $('status-msg').textContent = (m.msgFor && m.msgFor[myId()]) || (m.turn ? turnText(m.turn) : m.msg) || '';
     renderScore(m);
     renderBank(m);
+  }
+
+  // El texto del turno se arma en cada teléfono: con los totales ocultos no dice la suma de la mano.
+  function turnText(t) {
+    if (!t.pid) return `Juega ${t.name}.`;
+    const sit = settings.training.showTotals ? `${t.hand} contra ${t.up}` : `el crupier muestra ${t.up}`;
+    return t.pid === myId() ? `Tu turno: ${sit}.` : `Turno de ${t.name}: ${sit}.`;
   }
 
   /* ---------- Render de cartas, manos y asientos ---------- */
@@ -554,7 +566,7 @@
     }
     syncCards(n.cards, hv.cards);
     n.root.classList.toggle('active', !!hv.active);
-    n.total.hidden = hv.cards.length === 0;
+    n.total.hidden = hv.cards.length === 0 || !(settings.training.showTotals || hv.result || T.paintOver);
     n.total.textContent = hv.natural ? 'BJ' : hv.cards.length ? totalText(hv.cards) : '';
     if (hv.result) {
       const r = hv.result;
@@ -989,7 +1001,7 @@
         : `${NAME[a]} no es lo correcto: ${NAME[g.action]}`;
       feedback(p, ok ? 'ok' : 'bad', title, explainDecision(g, hand.cards, T.upV, tcx));
       if (!ok && settings.training.onMistake === 'retry') {
-        setMsg(`Corrige la jugada para seguir.`, { [p.id]: 'Corrige la jugada para seguir.' });
+        setMsg('', { [p.id]: 'Corrige la jugada para seguir.' });
         continue;
       }
       return a;
@@ -1009,10 +1021,12 @@
       if (!avail.hit && !avail.split && !avail.double) break; // ases separados: una sola carta
       let a;
       if (p && !p.gone) {
-        const sit = `${handLabel(hand.cards)} contra ${BJ.upLabel(T.upV)}`;
-        setMsg(`Turno de ${p.name}: ${sit}.`, { [p.id]: `Tu turno: ${sit}.` });
+        T.turn = { pid: p.id, name: p.name, hand: handLabel(hand.cards), up: BJ.upLabel(T.upV) };
+        setMsg('');
         a = await userDecision(p, hand, avail);
       } else {
+        T.turn = { pid: null, name: seat.name };
+        setMsg('');
         await pause(1.1);
         a = BJ.basicDecision(hand.cards, T.upV, avail, T.rules).action;
       }
@@ -1143,8 +1157,10 @@
         }
         const per = {};
         const names = waiting.map((p) => p.name).join(' y ');
-        for (const p of hs) per[p.id] = bets.has(p.id) ? `Esperando la apuesta de ${names}…` : 'Haz tu apuesta.';
-        setMsg(T.betMsg || 'Haz tu apuesta.', Object.assign(per, T.betMsgFor || {}));
+        // Mientras se apuesta sigue a la vista el resultado de la mano anterior.
+        const last = (p) => (T.lastResult ? (T.lastResult.per[p.id] || T.lastResult.msg) + ' ' : '');
+        for (const p of hs) per[p.id] = bets.has(p.id) ? `Esperando la apuesta de ${names}…` : T.betMsg || last(p) + 'Haz tu apuesta.';
+        setMsg(T.betMsg || 'Haz tu apuesta.', per);
       };
       const request = (p) => {
         if (asked.has(p.id)) return;
@@ -1170,6 +1186,7 @@
     }
     if (!T.shoe || T.needShuffle || T.shoe.cutReached) {
       const wasCut = T.shoe && T.shoe.cutReached;
+      T.lastResult = null;
       clearTable();
       shuffleShoe();
       T.betMsg = wasCut
@@ -1189,6 +1206,9 @@
     for (const [pid, bet] of bets) if (bet > 0) gradeBet(playerById(pid), bet);
     clearTable();
     setupSeats(bets);
+    T.over = false;
+    T.lastResult = null;
+    T.turn = null;
     T.round++;
     renderBotsPicker();
     for (const seat of T.seats) if (seat.pid) recordStat(playerById(seat.pid), { hands: 1 });
@@ -1276,6 +1296,8 @@
     T.quizDue =
       q === 'round' || (q === 'every5' && T.round % 5 === 0) || (q === 'random' && rng() < 0.25) || (q === 'shoe' && T.shoe.cutReached);
     T.active = null;
+    T.over = true;
+    T.lastResult = { msg: head + tail, per };
     setMsg(head + tail, per);
     renderStats();
     save();
@@ -1772,7 +1794,7 @@
     const box = $('online');
     const locked = NET.role === 'guest';
     document.querySelectorAll('#rules-form input, #train-form input').forEach((i) => {
-      const display = /^f-(showTags|showDecks|speed)-/.test(i.id);
+      const display = /^f-(showTags|showTotals|showDecks|speed)-/.test(i.id);
       i.disabled = locked && !display;
     });
     $('rules-lock').hidden = !locked;
@@ -1985,7 +2007,10 @@
     $('sd-hand').replaceChildren(...handEls);
     handEls.forEach((el) => animateFrom(el, null));
     $('sd-total').textContent = totalText(sc.cards);
-    $('sd-prompt').textContent = `${handLabel(sc.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`;
+    $('sd-total').hidden = !settings.training.showTotals;
+    $('sd-prompt').textContent = settings.training.showTotals
+      ? `${handLabel(sc.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`
+      : `El crupier muestra ${BJ.upLabel(SD.cur.upV)}. Suma tu mano y decide: ¿qué haces?`;
     $('sd-actions').replaceChildren(...actionButtons(avail, sdAnswer));
     showFeedback($('sd-fb'), 'info', 'Elige una jugada', [
       'Atajos: <b>H</b> pedir, <b>S</b> plantarse, <b>D</b> doblar, <b>P</b> separar, <b>R</b> rendirse. <b>Enter</b> pasa a la siguiente.',
@@ -1996,6 +2021,7 @@
 
   function sdAnswer(a) {
     if (SD.answered || !SD.cur) return;
+    $('sd-total').hidden = false;
     const c = SD.cur;
     const r = activeRules();
     const d = BJ.basicDecision(c.cards, c.upV, c.avail, r);
@@ -2117,6 +2143,7 @@
     $('dv-up').replaceChildren(makeCardEl(sc.upCard));
     $('dv-hand').replaceChildren(...cards.map((c) => makeCardEl(c)));
     $('dv-total').textContent = totalText(cards);
+    $('dv-total').hidden = !settings.training.showTotals;
     const box = $('dv-actions');
     if (DV.mode === 'index') {
       $('dv-tc').textContent = BJ.deviationName(sc.dev);
@@ -2158,6 +2185,7 @@
 
   function dvAnswer(a) {
     if (DV.answered || !DV.cur) return;
+    $('dv-total').hidden = false;
     const c = DV.cur;
     const d = c.dev;
     const r = activeRules();
@@ -2662,6 +2690,12 @@
     { key: 'quizTC', label: 'Preguntar también el true count', options: [[true, 'Sí'], [false, 'No']] },
     { key: 'showTags', label: 'Valor Hi-Lo bajo cada carta', hint: 'Ayuda para empezar.', options: [[false, 'Oculto'], [true, 'Visible']] },
     {
+      key: 'showTotals',
+      label: 'Total de cada mano',
+      hint: 'Ocúltalo para practicar la suma de las cartas; aparece al terminar la mano.',
+      options: [[true, 'Visible'], [false, 'Oculto']],
+    },
+    {
       key: 'showDecks',
       label: 'Mazos restantes en números',
       hint: 'Si está oculto, estímalos con la bandeja de descartes.',
@@ -2683,7 +2717,8 @@
   // Selector rápido de robots bajo la mesa (el mismo ajuste que "Otros jugadores" en Reglas).
   function renderBotsPicker() {
     const guest = NET.role === 'guest';
-    $('table-opts').hidden = guest;
+    $('bots-opts').hidden = guest;
+    $('opt-totals').checked = settings.training.showTotals;
     if (guest) return;
     seg('bots-seg', 'bots-seg', [[0, 'Ninguno'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], settings.training.bots, (v) => {
       settings.training.bots = v;
@@ -2746,6 +2781,12 @@
 
   function onTrainChange(key) {
     if (key === 'speed') applySpeed();
+    if (key === 'showTotals') {
+      const show = settings.training.showTotals;
+      $('opt-totals').checked = show;
+      if (!SD.answered) $('sd-total').hidden = !show;
+      if (!DV.answered) $('dv-total').hidden = !show;
+    }
     if (key === 'bots') setTimeout(renderBotsPicker, 0);
     if ((key === 'bots' || key === 'seat') && T.betCollector && tableCardCount() === 0) {
       setupSeats(null);
@@ -3036,6 +3077,16 @@
       buildForm('rules-form', RULE_FIELDS, settings.rules, onRuleChange);
       renderOnline();
       onRuleChange('decks');
+    });
+
+    $('opt-totals').addEventListener('change', (e) => {
+      settings.training.showTotals = e.target.checked;
+      const f = TRAIN_FIELDS.find((x) => x.key === 'showTotals');
+      seg('f-showTotals', 'f-showTotals', f.options, settings.training.showTotals, (v) => {
+        settings.training.showTotals = v;
+        onTrainChange('showTotals');
+      });
+      onTrainChange('showTotals');
     });
 
     // En línea e instalación
