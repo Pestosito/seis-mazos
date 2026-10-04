@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
   const AC = root.AudioContext || root.webkitAudioContext;
-  const S = { enabled: true, volume: 0.7, ambience: 'music', voice: false };
+  const S = { enabled: true, volume: 0.7, ambience: 'music', voice: false, voiceName: '' };
   let ctx = null;
   let master;
   let fx;
@@ -243,29 +243,6 @@
         chatGain.gain.setTargetAtTime(peak, t, 0.05);
       }, 170),
     );
-    // Sonidos lejanos del casino.
-    const distant = () => {
-      if (ready()) {
-        const r = Math.random();
-        const t = now();
-        if (r < 0.4) {
-          // tragamonedas pagando
-          const notes = [1046.5, 1318.5, 1568, 2093, 1568, 2093, 2637];
-          notes.forEach((f, i) => tone({ t: t + i * 0.075, freq: f, type: 'square', lp: 2600, d: 0.09, peak: 0.018, dest: amb }));
-        } else if (r < 0.75) {
-          for (let i = 0; i < 6; i++) {
-            const tt = t + i * rand(0.04, 0.09);
-            tone({ t: tt, freq: rand(2800, 3500), type: 'triangle', d: 0.05, peak: 0.03, dest: amb });
-            burst({ t: tt, dur: 0.02, freq: 5000, q: 2, peak: 0.02, dest: amb });
-          }
-        } else {
-          tone({ t, freq: 1568, d: 1.2, peak: 0.02, dest: amb });
-          tone({ t: t + 0.18, freq: 2093, d: 1.4, peak: 0.016, dest: amb });
-        }
-      }
-      timers.push(setTimeout(distant, rand(5000, 13000)));
-    };
-    timers.push(setTimeout(distant, rand(2000, 5000)));
     ambience = { nodes, timers, music: null };
     if (S.ambience === 'music') ambience.music = startMusic();
   }
@@ -336,25 +313,55 @@
   }
 
   /* ---------- Voz del crupier ---------- */
+  // Prefiere voces femeninas y naturales en español: las «mejoradas» o «premium» del iPhone,
+  // las «Natural» de Edge y la de Google en Android suenan mucho más humanas.
+  const FEMALE = /paulina|m[oó]nica|marisol|ang[eé]lica|soledad|isabela|francisca|sabina|helena|laura|dalia|elvira|paloma|carmen|luc[ií]a|esperanza|valeria|camila|ximena|renata|elena|beatriz|lupe|pen[eé]lope|conchita|google español|female|mujer/i;
+  const MALE = /juan|jorge|diego|carlos|pablo|ra[uú]l|enrique|miguel|alberto|[aá]lvaro|jos[eé]|antonio|\bmale\b|hombre/i;
+  const NOVELTY = /eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|bells|bubbles|albert|bad news|boing|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|bahh|junior|ralph|kathy|fred/i;
+  function voiceScore(v) {
+    const id = v.name + ' ' + (v.voiceURI || '');
+    let s = 0;
+    if (/^es[-_]MX/i.test(v.lang)) s += 4;
+    else if (/^es[-_](US|419)/i.test(v.lang)) s += 3;
+    else if (/^es[-_]ES/i.test(v.lang)) s += 2;
+    if (FEMALE.test(id)) s += 6;
+    if (MALE.test(id)) s -= 8;
+    if (/premium/i.test(id)) s += 7;
+    else if (/enhanced|mejorad|natural|neural|online/i.test(id)) s += 5;
+    if (NOVELTY.test(id)) s -= 20;
+    return s;
+  }
+  function spanishVoices() {
+    if (!root.speechSynthesis) return [];
+    return root.speechSynthesis
+      .getVoices()
+      .filter((v) => /^es/i.test(v.lang))
+      .sort((a, b) => voiceScore(b) - voiceScore(a));
+  }
+  const voiceId = (v) => v.voiceURI || v.name;
   let voice = null;
   function pickVoice() {
-    if (voice || !root.speechSynthesis) return voice;
-    const vs = root.speechSynthesis.getVoices();
-    voice =
-      vs.find((v) => /^es[-_](MX|US|419)/i.test(v.lang)) || vs.find((v) => /^es[-_]ES/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+    if (voice) return voice;
+    const vs = spanishVoices();
+    voice = (S.voiceName && vs.find((v) => voiceId(v) === S.voiceName)) || vs[0] || null;
     return voice;
   }
-  function say(text) {
-    if (!S.voice || !S.enabled || !unlocked || !root.speechSynthesis || document.visibilityState !== 'visible') return;
+  let lastSaid = 0;
+  // Pocas frases, despacio y bajito: nunca corta una frase a medias ni encadena una tras otra.
+  function say(text, force) {
+    const synth = root.speechSynthesis;
+    if (!synth || !S.enabled || (!force && (!S.voice || !unlocked || document.visibilityState !== 'visible'))) return;
+    if (!force && (synth.speaking || synth.pending || Date.now() - lastSaid < 6000)) return;
+    if (force) synth.cancel();
+    lastSaid = Date.now();
     const u = new root.SpeechSynthesisUtterance(text);
     const v = pickVoice();
     if (v) u.voice = v;
     u.lang = v ? v.lang : 'es-MX';
-    u.rate = 1.03;
-    u.pitch = 0.92;
-    u.volume = Math.min(1, S.volume + 0.25);
-    root.speechSynthesis.cancel();
-    root.speechSynthesis.speak(u);
+    u.rate = 0.9;
+    u.pitch = 1.04;
+    u.volume = Math.max(0.15, Math.min(1, S.volume * 0.8));
+    synth.speak(u);
   }
 
   /* ---------- API ---------- */
@@ -411,6 +418,7 @@
     },
     configure(opts) {
       const prevAmb = S.ambience;
+      if (opts.voiceName !== undefined && opts.voiceName !== S.voiceName) voice = null;
       Object.assign(S, opts);
       if (!ctx) return;
       audioSession();
@@ -431,6 +439,15 @@
       }, () => {});
     },
     say,
+    voices: () => spanishVoices().map((v) => ({ id: voiceId(v), name: v.name, lang: v.lang })),
+    get voiceName() {
+      const v = pickVoice();
+      return v ? v.name : '';
+    },
+    testVoice() {
+      say('Hola, bienvenido a la mesa. Hagan sus apuestas.', true);
+    },
+    onVoices: null,
   };
   for (const k of Object.keys(fxs))
     api[k] = (...args) => {
@@ -440,6 +457,7 @@
     root.speechSynthesis.addEventListener('voiceschanged', () => {
       voice = null;
       pickVoice();
+      if (api.onVoices) api.onVoices();
     });
   root.SFX = api;
 })(typeof window !== 'undefined' ? window : this);

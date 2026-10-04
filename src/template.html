@@ -25,8 +25,21 @@
       <button class="icon-btn" type="button" id="sound-btn" aria-label="Silenciar el sonido" title="Sonido">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>
       </button>
-      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
+      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><button class="bank-btn" type="button" id="bank-btn" title="Cambiar la banca"><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button></div>
   </header>
+
+  <dialog class="dialog" id="bank-dialog" aria-labelledby="bank-dlg-title">
+    <form method="dialog" id="bank-form">
+      <h2 id="bank-dlg-title">Cambiar la banca</h2>
+      <p class="small muted" id="bank-dlg-note"></p>
+      <div id="bank-field"></div>
+      <div class="controls start" id="bank-presets"></div>
+      <div class="controls end">
+        <button class="btn ghost" type="submit" value="cancel">Cancelar</button>
+        <button class="btn primary" type="submit" value="ok">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="install-banner" id="update-banner" hidden>
     <div class="install-text"><b>Hay una versión nueva de Seis Mazos</b><span>Toca «Actualizar» cuando termines la mano.</span></div>
@@ -88,7 +101,7 @@
                 <div class="seg" id="bots-seg" role="radiogroup" aria-label="Jugadores robot en la mesa"></div>
                 <span class="small muted" id="bots-note"></span>
               </div>
-              <label class="check"><input type="checkbox" id="opt-totals"> Mostrar el total de cada mano</label>
+              <label class="check"><input type="checkbox" id="opt-totals" data-totals> Mostrar el total de cada mano</label>
             </div>
           </div>
         </div>
@@ -138,6 +151,7 @@
             <div class="seg" id="sd-filter" role="radiogroup" aria-label="Tipo de mano"></div>
             <label class="check"><input type="checkbox" id="sd-focus"> Repasar mis errores</label>
             <label class="check"><input type="checkbox" id="sd-auto" checked> Pasar sola si aciertas</label>
+            <label class="check"><input type="checkbox" id="sd-totals" data-totals> Mostrar el total de mi mano</label>
           </div>
           <div class="felt mini hide-tags">
             <div class="mini-row">
@@ -199,6 +213,7 @@
             <div class="seg" id="dv-mode" role="radiogroup" aria-label="Modo"></div>
             <div class="seg" id="dv-show" role="radiogroup" aria-label="Dato mostrado"></div>
             <div class="seg" id="dv-set" role="radiogroup" aria-label="Grupo"></div>
+            <label class="check"><input type="checkbox" id="dv-totals" data-totals> Mostrar el total de mi mano</label>
           </div>
           <div class="felt mini hide-tags">
             <div class="tc-badge num" id="dv-tc"></div>
@@ -273,6 +288,7 @@
             <p class="small muted">Versión <span class="num">__APP_VERSION__</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
+              <button class="btn small" type="button" id="btn-bank-edit">Cambiar banca</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
               <button class="btn small" type="button" id="btn-stats">Borrar estadísticas</button>
               <button class="btn small" type="button" id="btn-defaults">Reglas por defecto</button>
@@ -290,6 +306,9 @@
 </script>
 <script>
 /*__ENGINE__*/
+</script>
+<script>
+/*__EXPLAIN__*/
 </script>
 <script>
 /*__APP__*/

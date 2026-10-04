@@ -315,6 +315,61 @@ select {
 .bank b.neg {
   color: var(--bad);
 }
+.bank-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.bank-btn:hover,
+.bank-btn:focus-visible {
+  border-color: var(--line);
+}
+.bank-btn svg {
+  width: 13px;
+  height: 13px;
+  align-self: center;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+.dialog {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 18px;
+  width: min(360px, calc(100vw - 32px));
+  box-shadow: var(--shadow);
+}
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.dialog h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+.dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dialog .stepper input {
+  flex: 1;
+  width: auto;
+  font-size: 1.1rem;
+}
+.controls.end {
+  justify-content: flex-end;
+}
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -978,9 +1033,15 @@ button.chip:active {
   gap: 2px;
   min-width: 0;
 }
+.flash-fb {
+  cursor: pointer;
+}
 .flash-why {
   color: var(--ink);
   font-size: 0.85rem;
+}
+.flash-why + .flash-why {
+  margin-top: 3px;
 }
 .flash-fb.pop {
   animation: pop 240ms ease-out;
@@ -1862,4 +1923,22 @@ table.score tr.total td {
   .tray-stack {
     transition: none;
   }
+}
+.voice-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.voice-pick select {
+  min-width: 0;
+  max-width: 230px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+#bank-field .stepper .sign {
+  display: none;
 }

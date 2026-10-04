@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const BJ = window.BJ;
+  const BJX = window.BJX;
   const rng = BJ.defaultRng();
   const NAME = Object.assign({}, BJ.ACTION_NAMES, { I: 'Tomar seguro', N: 'No tomar seguro' });
   const ACTIONS = ['H', 'S', 'D', 'P', 'R'];
@@ -11,6 +12,8 @@
   const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
   // Sonidos (audio.js). Si no está disponible, todas las llamadas se ignoran.
   const SFX = window.SFX || new Proxy({}, { get: () => () => {} });
+  // Sonidos de la mesa: solo suenan si la estás viendo (en línea la mesa sigue aunque cambies de pestaña).
+  const TFX = new Proxy({}, { get: (_, k) => (...a) => (state.tab === 'mesa' ? SFX[k](...a) : undefined) });
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -73,6 +76,7 @@
     volume: 0.7,
     ambience: 'music',
     voice: false,
+    voiceName: '',
     casino: true,
     quiz: 'every5',
     quizTC: true,
@@ -82,6 +86,7 @@
     gradeBets: true,
     unit: 25,
     maxSpread: 12,
+    ramp: 'bja',
     bots: 2,
     seat: 'third',
     speed: 'normal',
@@ -354,6 +359,18 @@
   function tableSpread() {
     return NET.role === 'guest' && NET.view ? NET.view.maxSpread : settings.training.maxSpread;
   }
+  function tableRamp() {
+    return NET.role === 'guest' && NET.view ? NET.view.ramp : settings.training.ramp;
+  }
+  const rampUnits = (tc) => BJ.rampUnits(tc, tableSpread(), tableRamp());
+  // La rampa en una línea, con ejemplos en unidades.
+  function rampText() {
+    const max = tableSpread();
+    const ex = (tc) => `${signed(tc)} → ${rampUnits(tc)} u`;
+    return tableRamp() === 'soft'
+      ? `(TC − 1) unidades, mínimo 1: ${ex(2)}, ${ex(3)}, ${ex(4)}, ${ex(5)}… máximo ${max} u`
+      : `TC +1 o menos → 1 u (mínima); desde +2, (TC − 1) × 2: ${ex(2)}, ${ex(3)}, ${ex(4)}, ${ex(5)}… máximo ${max} u`;
+  }
 
   // Mensaje de estado; `per` permite un texto distinto para cada jugador.
   function setMsg(m, per) {
@@ -468,6 +485,7 @@
       rules: settings.rules,
       unit: settings.training.unit,
       maxSpread: settings.training.maxSpread,
+      ramp: settings.training.ramp,
       mode: NET.mode,
       team: team.bank,
       players: players.map((p) => ({ id: p.id, name: p.name, gone: !!p.gone, bank: bankOf(p), s: p.session })),
@@ -492,10 +510,6 @@
     const dt = $('dealer-total');
     const visible = m.dealer.filter((c) => !c.down);
     T.paintOver = !!m.over;
-    if (m.over && !T.overSeen) {
-      T.overSeen = true;
-      if (BJ.handValue(m.dealer.filter((c) => !c.down)).total > 21) SFX.say('El crupier se pasa.');
-    } else if (!m.over) T.overSeen = false;
     dt.hidden = !m.dealer.length || !(settings.training.showTotals || m.over);
     if (visible.length) dt.textContent = totalText(visible);
     syncChildren($('seats'), m.seats.map(seatNode));
@@ -555,17 +569,17 @@
     const dealer = $('dealer-cards');
     const spot = n.root.querySelector('.spot');
     if (kind === 'bj') {
-      SFX.blackjack();
-      SFX.say('¡Blackjack!');
+      TFX.blackjack();
+      TFX.say('Blackjack. Felicidades.');
       showBanner('BLACKJACK');
       flyChips(dealer, spot, 8, 100);
     } else if (kind === 'win' || kind === 'even') {
-      SFX.win();
+      TFX.win();
       flyChips(dealer, spot, 5, 25);
     } else if (kind === 'lose' || kind === 'bust' || kind === 'surrender') {
-      SFX.lose();
+      TFX.lose();
       flyChips(spot, dealer, kind === 'surrender' ? 1 : 3, 25);
-    } else SFX.push();
+    } else TFX.push();
     if (kind === 'bj' || kind === 'win' || kind === 'even') {
       n.root.classList.remove('won');
       void n.root.offsetWidth;
@@ -589,7 +603,7 @@
       }
       el.classList.remove('down');
       flipIn(el);
-      SFX.flip();
+      TFX.flip();
     }
     el.setAttribute('aria-label', cv.down ? 'Carta boca abajo' : cardName(cv));
     return el;
@@ -603,7 +617,7 @@
       if (el._fresh) {
         el._fresh = false;
         animateFrom(el, shoe);
-        SFX.card();
+        TFX.card();
       }
   }
 
@@ -651,7 +665,7 @@
     }
     if (hv.doubled && !n.doubledFx) {
       n.doubledFx = true;
-      SFX.chip(2);
+      TFX.chip(2);
     }
     if (hv.result) {
       const r = hv.result;
@@ -700,8 +714,8 @@
     const s = m && m.shoe;
     if (!s) return;
     if (T.seenRemaining != null && s.remaining > T.seenRemaining + 4) {
-      SFX.shuffle();
-      SFX.say('Barajando. Hagan sus apuestas.');
+      TFX.shuffle();
+      TFX.say('Barajamos. Hagan sus apuestas.');
     }
     T.seenRemaining = s.remaining;
     if (T.tickDecks !== s.decks) buildTrayTicks(s.decks);
@@ -723,7 +737,7 @@
     $('hud-tc').textContent = signed(tc, 1);
     $('hud-decks').textContent = (c.remaining / 52).toFixed(1);
     const edge = 0.5 * tc - BJ.houseEdge(activeRules());
-    const units = BJ.rampUnits(tc, tableSpread());
+    const units = rampUnits(tc);
     $('hud-extra').textContent = veiled
       ? 'Cuenta tú; ábrelo para comprobar.'
       : `Ventaja ≈ ${edge >= 0 ? '+' : '−'}${Math.abs(edge).toFixed(2)}% · rampa ${units} u (${money(units * tableUnit())})`;
@@ -736,6 +750,48 @@
     $('bank-label').textContent = coop ? 'Banca del equipo' : 'Banca';
     b.textContent = money(val);
     b.classList.toggle('neg', val < 0);
+  }
+
+  /* ---------- Cambiar la banca ---------- */
+  const coopBank = () => (NET.role === 'host' || NET.role === 'guest') && NET.mode === 'coop';
+  function currentBank() {
+    if (coopBank()) return NET.role === 'guest' ? (NET.view && NET.view.team) || 0 : team.bank;
+    return state.bankroll;
+  }
+  function setBank(v) {
+    v = Math.max(0, Math.min(10000000, Math.round(v)));
+    const coop = coopBank();
+    if (!coop) state.bankroll = v;
+    if (NET.role === 'guest') NET.sendHost({ t: 'bank', bank: v });
+    else if (coop) team.bank = v;
+    renderBank(NET.role === 'guest' ? NET.view : null);
+    renderTable();
+    renderStats();
+    save();
+  }
+  function openBankDialog() {
+    const dlg = $('bank-dialog');
+    if (!dlg || typeof dlg.showModal !== 'function') {
+      const v = window.prompt('Banca nueva', String(currentBank()));
+      if (v != null) setBank(parseNum(v));
+      return;
+    }
+    const coop = coopBank();
+    const field = stepper('bank-input', currentBank(), 500, false);
+    $('bank-field').replaceChildren(field.root);
+    $('bank-dlg-note').textContent = coop
+      ? 'Es la banca del equipo: el cambio lo ven todos en la mesa.'
+      : 'Las estadísticas no se borran; solo cambia el dinero con el que juegas.';
+    $('bank-presets').replaceChildren(
+      ...[1000, 2500, 5000, 10000, 25000].map((v) =>
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => (field.input.value = String(v)) }, money(v)),
+      ),
+    );
+    dlg.returnValue = '';
+    dlg.onclose = () => {
+      if (dlg.returnValue === 'ok') setBank(field.value());
+    };
+    dlg.showModal();
   }
 
   function renderScore(m) {
@@ -866,7 +922,7 @@
         h('b', null, money(T.bet)),
         h('span', null, `${Number(units.toFixed(2))} u · unidad ${money(unit)}`),
       );
-      const ramp = BJ.rampUnits(tcExact(), tableSpread());
+      const ramp = rampUnits(tcExact());
       const online = NET.role !== 'solo';
       fill(
         box,
@@ -891,7 +947,7 @@
               {
                 class: 'btn small ghost',
                 type: 'button',
-                title: 'Apuesta según la rampa (TC − 1) unidades',
+                title: 'Apuesta según la rampa: ' + rampText(),
                 onclick: () => {
                   T.bet = ramp * unit;
                   renderControls();
@@ -919,7 +975,7 @@
       const bet = p.data.bet;
       if (!p.said) {
         p.said = true;
-        SFX.say(p.data.natural ? '¿Pago igual?' : '¿Seguro?');
+        TFX.say(p.data.natural ? '¿Pago igual?' : '¿Desea seguro?');
       }
       box.append(
         h('span', null, p.data.natural ? '¿Aceptas pago igual (1 a 1)?' : `¿Seguro por ${money(bet / 2)}?`),
@@ -1005,13 +1061,18 @@
 
   // Corrección al instante, justo encima de los botones de la mesa (visible también en el teléfono).
   let flashTimer = null;
+  // Si aciertas se ve solo el porqué; si fallas (o pides pista), la explicación completa.
+  // Un toque lo cierra.
   function flashFeedback(verdict, mark, title, lines) {
     const el = $('flash-fb');
     clearTimeout(flashTimer);
+    lines = lines || [];
+    const why = lines.find((l) => l.startsWith(WHY));
+    const shown = verdict === 'ok' ? (why ? [why] : lines.slice(-1)) : lines;
     fill(
       el,
       h('span', { class: 'mark' }, mark),
-      h('div', null, h('b', null, title), lines && lines.length ? h('span', { class: 'flash-why', html: lines[lines.length > 1 && verdict !== 'info' ? lines.length - 1 : 0] }) : null),
+      h('div', null, h('b', null, title), shown.map((l) => h('span', { class: 'flash-why', html: l }))),
     );
     el.className = 'flash-fb ' + verdict;
     el.hidden = false;
@@ -1020,7 +1081,8 @@
     el.classList.remove('pop');
     void el.offsetWidth;
     el.classList.add('pop');
-    flashTimer = setTimeout(() => (el.hidden = true), verdict === 'bad' ? 9000 : verdict === 'ok' ? 3500 : 6000);
+    const read = shown.join(' ').replace(/<[^>]+>/g, '').length;
+    flashTimer = setTimeout(() => (el.hidden = true), Math.max(verdict === 'ok' ? 4000 : 9000, read * 70));
   }
 
   function renderStats() {
@@ -1060,18 +1122,53 @@
     return '';
   }
 
-  function explainDecision(g, cards, upV, tc) {
+  const WHY = '<b>Por qué:</b> ';
+
+  // Resultado de una desviación con el true count actual.
+  function devThen(dev, applies) {
+    return applies ? dev.above : dev.kind === 'sur' ? null : dev.below;
+  }
+  function devRule(dev) {
+    const idx = BJX.idxText(dev.index);
+    if (dev.kind === 'sur') return `rendirse solo con TC ${idx} o más`;
+    if (dev.kind === 'pair') return `separar con TC ${idx} o más; si no, plantarse`;
+    return `${NAME[dev.above].toLowerCase()} con TC ${idx} o más; si no, ${NAME[dev.below].toLowerCase()}`;
+  }
+
+  /*
+   * Explicación completa de una jugada: lo que dice la tabla, el conteo, las desviaciones
+   * que entran en juego y el porqué en palabras.
+   * avail: acciones posibles; cnt: { rc, remaining } al momento de decidir (opcional).
+   */
+  function explainDecision(g, cards, upV, tc, avail, cnt) {
+    const r = activeRules();
     const b = g.basic;
     const lines = [
-      `Básica: <b>${handLabel(cards)}</b> contra <b>${BJ.upLabel(upV)}</b> → <b>${NAME[b.action]}</b>${codeNote(b.code, b.action)}`,
+      `<b>Tabla básica:</b> ${handLabel(cards)} contra ${BJ.upLabel(upV)} → <b>${NAME[b.action]}</b>${codeNote(b.code, b.action)}`,
     ];
-    for (const { dev, applies } of g.devs) {
-      const idx = signed(dev.index);
-      const then = applies ? NAME[dev.above] : dev.kind === 'sur' ? 'no rendirse' : NAME[dev.below];
+    let cause = null;
+    if (g.devs.length) {
+      const decks = cnt ? Math.max(cnt.remaining, 1) / 52 : null;
       lines.push(
-        `Desviación <b>${BJ.deviationName(dev)}</b> (índice ${idx}): TC ${signed(tc, 1)} ${applies ? '≥' : '<'} ${idx} → <b>${then}</b>`,
+        cnt
+          ? `<b>Tu conteo:</b> RC ${signed(cnt.rc)} ÷ ${decks.toFixed(1)} mazos = TC <b>${signed(tc, 1)}</b>`
+          : `<b>Tu conteo:</b> TC <b>${signed(tc, 1)}</b>`,
       );
     }
+    for (const { dev, applies } of g.devs) {
+      const then = devThen(dev, applies);
+      if (!cause && g.isDeviation && (then || 'no-R') !== b.action) cause = { dev, applies };
+      lines.push(
+        `<b>Desviación ${BJX.GROUP_NAME[dev.group]}</b> · ${BJ.deviationName(dev)}: ${devRule(dev)}. Con ${signed(tc, 1)} → <b>${then ? NAME[then] : 'no rendirse'}</b>`,
+      );
+    }
+    const total = BJ.handValue(cards).total;
+    lines.push(
+      WHY +
+        (cause
+          ? BJX.deviationWhy(cause.dev, cause.applies, total)
+          : BJX.basicWhy(cards, upV, r, b, !!(avail && avail.split))),
+    );
     if (g.borderline) {
       const other = [...g.accepted].find((a) => a !== g.action);
       lines.push(`Estás justo en el índice: estimando los mazos a medio mazo también vale <b>${NAME[other]}</b>.`);
@@ -1079,11 +1176,32 @@
     return lines;
   }
 
+  // Título del aviso: dice si fue la básica, una desviación o te faltó (o sobró) conteo.
+  function decisionTitle(a, ok, g, tc) {
+    const tcs = signed(tc, 1);
+    if (ok) {
+      if (a !== g.action) return `${NAME[a]}: correcto (estás justo en el índice)`;
+      if (g.isDeviation) return `${NAME[a]}: correcto. Es desviación por conteo (la básica dice ${NAME[g.basic.action]})`;
+      return `${NAME[a]}: correcto`;
+    }
+    if (g.isDeviation && a === g.basic.action) return `${NAME[a]} es la básica, pero con TC ${tcs} toca ${NAME[g.action]}`;
+    for (const { dev, applies } of g.devs) {
+      const other = applies ? (dev.kind === 'sur' ? null : dev.below) : dev.above;
+      if (other === a) {
+        const cond = applies ? `menor a ${BJX.idxText(dev.index)}` : `${BJX.idxText(dev.index)} o más`;
+        return `${NAME[a]} solo con TC ${cond}; con ${tcs} toca ${NAME[g.action]}`;
+      }
+    }
+    return `${NAME[a]} no es lo correcto: toca ${NAME[g.action]}`;
+  }
+
   /* ---------- Desarrollo de una mano (solo en el anfitrión) ---------- */
   async function userDecision(p, hand, avail) {
     const useDev = settings.training.useDeviations;
     const tcx = tcExact();
+    const cnt = liveCount();
     const g = BJ.gradeDecision(hand.cards, T.upV, avail, T.rules, tcx, tcEst(), useDev);
+    const why = () => explainDecision(g, hand.cards, T.upV, tcx, avail, cnt);
     let first = true;
     let hinted = false;
     for (;;) {
@@ -1091,7 +1209,7 @@
       if (a == null || !(a === 'hint' || avail[AVAIL_KEY[a]])) return g.basic.action; // jugador desconectado
       if (a === 'hint') {
         hinted = true;
-        feedback(p, 'info', `Pista: ${NAME[g.action]}`, explainDecision(g, hand.cards, T.upV, tcx));
+        feedback(p, 'info', `Pista: ${NAME[g.action]}`, why());
         continue;
       }
       const ok = g.accepted.has(a);
@@ -1112,10 +1230,7 @@
         recordStat(p, d, err);
       }
       first = false;
-      const title = ok
-        ? `${NAME[a]}: correcto${g.isDeviation ? ' (desviación)' : ''}`
-        : `${NAME[a]} no es lo correcto: ${NAME[g.action]}`;
-      feedback(p, ok ? 'ok' : 'bad', title, explainDecision(g, hand.cards, T.upV, tcx));
+      feedback(p, ok ? 'ok' : 'bad', decisionTitle(a, ok, g, tcx), why());
       if (!ok && settings.training.onMistake === 'retry') {
         setMsg('', { [p.id]: 'Corrige la jugada para seguir.' });
         continue;
@@ -1188,6 +1303,20 @@
     if (seat.pid) credit(playerById(seat.pid), res.net);
   }
 
+  function insuranceLines(useDev, tc, take, natural) {
+    const even = natural ? ' El pago igual es lo mismo que tomar seguro teniendo blackjack.' : '';
+    if (!useDev)
+      return [
+        '<b>Estrategia básica:</b> no tomar seguro (ni pago igual).',
+        WHY + 'El seguro paga 2 a 1, así que solo gana si más de 1 de cada 3 cartas que quedan es 10. En un zapato normal son 4 de cada 13 (31%): a la larga pierde dinero.' + even,
+      ];
+    const dev = BJ.deviationList(activeRules()).find((d) => d.kind === 'ins');
+    return [
+      `<b>Desviación Ilustres 18</b> · Seguro: tomarlo solo con TC +3 o más. Con ${signed(tc, 1)} → <b>${take ? 'tomarlo' : 'no tomarlo'}</b>`,
+      WHY + BJX.deviationWhy(dev, take) + even,
+    ];
+  }
+
   async function gradedInsurance(p, natural, bet) {
     const useDev = settings.training.useDeviations;
     const tcx = tcExact();
@@ -1202,13 +1331,9 @@
         recordStat(p, { ins: 1, insCorrect: ok ? 1 : 0 }, err);
       }
       first = false;
-      const lines = [
-        useDev
-          ? `El seguro solo conviene con TC ≥ +3 (Hi-Lo). TC actual ${signed(tcx, 1)} → <b>${g.action === 'I' ? 'tomarlo' : 'no tomarlo'}</b>.`
-          : 'Con estrategia básica el seguro (y el pago igual) nunca conviene.',
-      ];
+      const lines = insuranceLines(useDev, tcx, g.action === 'I', natural);
       if (g.borderline) lines.push('Estás justo en el índice: se acepta cualquiera de las dos.');
-      feedback(p, ok ? 'ok' : 'bad', ok ? `${NAME[a]}: correcto` : `Lo correcto: ${NAME[g.action]}`, lines);
+      feedback(p, ok ? 'ok' : 'bad', ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[g.action]}`, lines);
       if (!ok && settings.training.onMistake === 'retry') continue;
       return a;
     }
@@ -1219,18 +1344,33 @@
     if (!t.gradeBets) return;
     const units = bet / t.unit;
     const tcx = tcExact();
-    const targets = [BJ.rampUnits(tcx, t.maxSpread), BJ.rampUnits(tcEst(), t.maxSpread)];
-    const ok = targets.some((s) => (s === 1 ? units <= 1.5 : Math.abs(units - s) <= Math.max(0.5, s * 0.25)));
+    const targets = [rampUnits(tcx), rampUnits(tcEst())];
+    const fits = (s) => (s === 1 ? units <= 1.5 : Math.abs(units - s) <= Math.max(0.5, s * 0.25));
+    const ok = targets.some(fits);
     const s = targets[0];
-    const err = ok ? null : { what: `Apuesta ${money(bet)}`, tc: `TC ${signed(tcx, 1)}`, you: `${Number(units.toFixed(2))} u`, right: `${s} u` };
+    const you = Number(units.toFixed(2));
+    const err = ok ? null : { what: `Apuesta ${money(bet)}`, tc: `TC ${signed(tcx, 1)}`, you: `${you} u`, right: `${s} u` };
     recordStat(p, { bets: 1, betsOk: ok ? 1 : 0 }, err);
-    feedback(
-      p,
-      ok ? 'ok' : 'bad',
-      ok ? `Apuesta de ${money(bet)}: acorde a la rampa` : `Apuesta de ${money(bet)}: fuera de la rampa`,
-      [`Rampa (TC − 1) unidades: con TC ${signed(tcx, 1)} tocan <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${Number(units.toFixed(2))} u.`],
-      true,
-    );
+    const floor = Math.floor(tcx + 1e-9);
+    const edge = 0.5 * tcx - BJ.houseEdge(activeRules());
+    const edgeTxt = `${edge >= 0 ? '+' : '−'}${Math.abs(edge).toFixed(1)}%`;
+    const firstRaise = [1, 2, 3, 4, 5].find((x) => rampUnits(x) > 1);
+    const why =
+      s === 1
+        ? `con TC ${signed(tcx, 1)} tu ventaja es ≈ ${edgeTxt}${edge < 0.25 ? ': la casa todavía gana o van casi parejos' : ''}, así que va la mínima. Se sube desde TC ${signed(firstRaise)}, cuando ya tienes ventaja (≈ +${(0.5 * firstRaise - BJ.houseEdge(activeRules())).toFixed(1)}%).`
+        : `con TC ${signed(tcx, 1)} tienes ≈ ${edgeTxt} de ventaja: apostar más cuando vas ganando es lo que hace ganar al conteo. Cada punto de TC suma ≈ 0.5%.`;
+    const title = ok
+      ? `Apuesta de ${money(bet)}: acorde a la rampa`
+      : you > s
+        ? `Apuesta de ${money(bet)}: muy alta. Con TC ${signed(tcx, 1)} tocan ${money(s * t.unit)}${s === 1 ? ' (la mínima)' : ''}`
+        : `Apuesta de ${money(bet)}: muy baja. Con TC ${signed(tcx, 1)} tocan ${money(s * t.unit)}`;
+    const lines = [
+      `<b>Tu conteo:</b> TC ${signed(tcx, 1)}. Para apostar se redondea hacia abajo: <b>${signed(floor)}</b> → <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${you} u.`,
+      `<b>Rampa:</b> ${rampText()}.`,
+      WHY + why,
+    ];
+    if (ok && !fits(s)) lines.push('Estás justo en el cambio de escalón: estimando los mazos a medio mazo también vale lo que apostaste.');
+    feedback(p, ok ? 'ok' : 'bad', title, lines, true);
   }
 
   async function countQuiz(p) {
@@ -1707,6 +1847,13 @@
       }
     } else if (msg.t === 'ping') {
       NET.send(p, { t: 'pong' });
+    } else if (msg.t === 'bank' && typeof msg.bank === 'number' && isFinite(msg.bank)) {
+      const v = Math.max(0, Math.min(10000000, Math.round(msg.bank)));
+      if (NET.mode === 'coop') team.bank = v;
+      else p.bank = v;
+      NET.status = `${p.name} cambió ${NET.mode === 'coop' ? 'la banca del equipo' : 'su banca'} a ${money(v)}.`;
+      renderOnline();
+      renderTable();
     } else if (msg.t === 'bye') {
       guestGone(p, `${p.name} salió de la mesa.`);
     } else if (msg.t === 'away' && !p.gone) {
@@ -2120,21 +2267,30 @@
     SD.answered = false;
     $('sd-up').replaceChildren(makeCardEl(sc.upCard));
     const handEls = sc.cards.map((c) => makeCardEl(c));
-    SFX.card();
-    setTimeout(() => SFX.card(), 110);
+    if (state.tab === 'estrategia') {
+      SFX.card();
+      setTimeout(() => SFX.card(), 110);
+    }
     $('sd-hand').replaceChildren(...handEls);
     handEls.forEach((el) => animateFrom(el, null));
     $('sd-total').textContent = totalText(sc.cards);
-    $('sd-total').hidden = !settings.training.showTotals;
-    $('sd-prompt').textContent = settings.training.showTotals
-      ? `${handLabel(sc.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`
-      : `El crupier muestra ${BJ.upLabel(SD.cur.upV)}. Suma tu mano y decide: ¿qué haces?`;
+    sdPrompt();
     $('sd-actions').replaceChildren(...actionButtons(avail, sdAnswer));
     showFeedback($('sd-fb'), 'info', 'Elige una jugada', [
       'Atajos: <b>H</b> pedir, <b>S</b> plantarse, <b>D</b> doblar, <b>P</b> separar, <b>R</b> rendirse. <b>Enter</b> pasa a la siguiente.',
     ]);
     $('sd-chart-title').textContent = 'Tabla';
     $('sd-chart').replaceChildren(h('p', { class: 'empty' }, 'La casilla de la tabla aparece al responder.'));
+  }
+
+  // Con el total oculto la pregunta no dice qué mano es: hay que sumarla.
+  function sdPrompt() {
+    if (!SD.cur || SD.answered) return;
+    const show = settings.training.showTotals;
+    $('sd-total').hidden = !show;
+    $('sd-prompt').textContent = show
+      ? `${handLabel(SD.cur.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`
+      : `El crupier muestra ${BJ.upLabel(SD.cur.upV)}. Suma tu mano y decide: ¿qué haces?`;
   }
 
   function sdAnswer(a) {
@@ -2163,6 +2319,7 @@
       ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[d.action]}`,
       [
         `<b>${handLabel(c.cards)}</b> contra <b>${BJ.upLabel(c.upV)}</b> → <b>${NAME[d.action]}</b>${codeNote(d.code, d.action)}`,
+        WHY + BJX.basicWhy(c.cards, c.upV, r, d, c.avail.split),
         ok && $('sd-auto').checked ? 'Siguiente en un momento…' : 'Pulsa <b>Enter</b> o el botón para la siguiente.',
       ],
     );
@@ -2323,10 +2480,10 @@
         right = g.action;
       }
       ok = a === right;
-      title = ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[right]}`;
+      title = g ? decisionTitle(a, ok, g, c.tc) : ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[right]}`;
       lines = g
-        ? explainDecision(Object.assign(g, { borderline: false }), c.cards, c.upV, c.tc)
-        : [`Seguro con TC ≥ +3. TC ${signed(c.tc, 1)} → <b>${right === 'I' ? 'tomarlo' : 'no tomarlo'}</b>.`];
+        ? explainDecision(Object.assign(g, { borderline: false }), c.cards, c.upV, c.tc, c.avail)
+        : insuranceLines(true, c.tc, right === 'I', false);
       if (DV.show === 'rc') lines.unshift(`TC = ${$('dv-tc').textContent.replace(' · quedan ', ' ÷ ')} = <b>${signed(c.tc, 2)}</b>`);
     }
     DV.answered = true;
@@ -2758,7 +2915,7 @@
         'Cuánto apostar',
         [
           `Cada punto de true count vale aproximadamente un 0,5 % de ventaja. Con tus reglas la casa parte de ≈${edge.toFixed(2).replace('.', ',')} %, así que la ventaja pasa al jugador hacia TC ${signed(breakEven, 1).replace('.', ',')}.`,
-          `Rampa usada aquí: (TC − 1) unidades, con un mínimo de 1 y un máximo de ${settings.training.maxSpread}. Con unidad de ${money(unit)}: TC +3 → ${money(2 * unit)}, TC +5 → ${money(4 * unit)}.`,
+          `Rampa usada aquí: ${rampText()}. El true count se redondea hacia abajo para apostar (TC +2,7 cuenta como +2). Con unidad de ${money(unit)}: TC +2 → ${money(rampUnits(2) * unit)}, TC +3 → ${money(rampUnits(3) * unit)}, TC +5 → ${money(rampUnits(5) * unit)}.`,
         ],
       ],
       [
@@ -2820,7 +2977,13 @@
       hint: 'Si está oculto, estímalos con la bandeja de descartes.',
       options: [[false, 'No'], [true, 'Sí']],
     },
-    { key: 'gradeBets', label: 'Evaluar la apuesta', hint: 'Según la rampa (TC − 1) unidades.', options: [[true, 'Sí'], [false, 'No']] },
+    { key: 'gradeBets', label: 'Evaluar la apuesta', hint: 'Según la rampa que elijas abajo.', options: [[true, 'Sí'], [false, 'No']] },
+    {
+      key: 'ramp',
+      label: 'Rampa de apuestas',
+      hint: 'Normal: mínima hasta TC +1 y desde +2, (TC − 1) × 2 unidades (como Blackjack Apprenticeship). Suave: (TC − 1) unidades.',
+      options: [['bja', 'Normal (BJA)'], ['soft', 'Suave']],
+    },
     { key: 'unit', label: 'Unidad de apuesta', options: [[10, '$10'], [25, '$25'], [50, '$50'], [100, '$100']] },
     { key: 'maxSpread', label: 'Apuesta máxima', options: [[8, '8 u'], [12, '12 u'], [16, '16 u']] },
     { key: 'bots', label: 'Otros jugadores', hint: 'Juegan estrategia básica; sus cartas también se cuentan.', options: [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4']] },
@@ -2902,8 +3065,8 @@
     if (key === 'speed') applySpeed();
     if (key === 'showTotals') {
       const show = settings.training.showTotals;
-      $('opt-totals').checked = show;
-      if (!SD.answered) $('sd-total').hidden = !show;
+      for (const el of document.querySelectorAll('[data-totals]')) el.checked = show;
+      sdPrompt();
       if (!DV.answered) $('dv-total').hidden = !show;
     }
     if (key === 'bots') setTimeout(renderBotsPicker, 0);
@@ -2914,7 +3077,7 @@
     renderPrint();
     renderTable();
     renderControls();
-    if (key === 'unit' || key === 'maxSpread') renderGuide();
+    if (key === 'unit' || key === 'maxSpread' || key === 'ramp') renderGuide();
     save();
   }
 
@@ -3014,7 +3177,7 @@
   /* ---------- Sonido y ambiente ---------- */
   function applyAudio() {
     const t = settings.training;
-    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice });
+    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice, voiceName: t.voiceName });
     document.documentElement.classList.toggle('casino', !!t.casino);
     const btn = $('sound-btn');
     btn.classList.toggle('muted', !t.sound);
@@ -3027,10 +3190,10 @@
     {
       key: 'ambience',
       label: 'Ambiente de sala',
-      hint: 'Murmullo, fichas y tragamonedas a lo lejos; con música lounge si quieres.',
+      hint: 'Murmullo suave de la sala; con música lounge si quieres.',
       options: [['off', 'Apagado'], ['room', 'Murmullo'], ['music', 'Murmullo y música']],
     },
-    { key: 'voice', label: 'Voz del crupier', hint: '«¡Blackjack!», «El crupier se pasa», «Barajando»…', options: [[false, 'No'], [true, 'Sí']] },
+    { key: 'voice', label: 'Voz del crupier', hint: 'Pocas frases, despacio: «Blackjack», «¿Desea seguro?» y «Barajamos».', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
   ];
 
@@ -3088,7 +3251,46 @@
       'Probar sonido',
     );
     $('sound-form').append(h('div', { class: 'setting' }, h('div', null, h('span', null, 'Prueba'), h('span', { class: 'hint', id: 'audio-state' }, '')), test));
+    $('sound-form').append(h('div', { class: 'setting', id: 'voice-row' }));
+    renderVoicePicker();
+    SFX.onVoices = renderVoicePicker;
     renderAudioState();
+  }
+
+  // Lista de voces en español del teléfono; la mejor (femenina y natural) va primero.
+  function renderVoicePicker() {
+    const row = $('voice-row');
+    if (!row || !SFX.voices) return;
+    const list = SFX.voices();
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const sel = h(
+      'select',
+      { id: 'f-voiceName', 'aria-label': 'Voz del crupier' },
+      h('option', { value: '' }, list.length ? `La más natural (${list[0].name})` : 'La del teléfono'),
+      list.map((v) => h('option', { value: v.id, selected: v.id === settings.training.voiceName }, `${v.name} · ${v.lang}`)),
+    );
+    sel.addEventListener('change', () => {
+      settings.training.voiceName = sel.value;
+      applyAudio();
+      save();
+      SFX.testVoice();
+    });
+    const test = h('button', { class: 'btn small', type: 'button', onclick: () => SFX.testVoice() }, 'Probar voz');
+    row.replaceChildren(
+      h(
+        'div',
+        null,
+        h('span', null, 'Voz'),
+        h(
+          'span',
+          { class: 'hint' },
+          ios
+            ? 'Para una voz más humana: Ajustes → Accesibilidad → Contenido leído → Voces → Español, y descarga «Paulina» o «Mónica» en versión Mejorada o Premium. Luego cierra y abre la app.'
+            : 'Si tu teléfono tiene voces «mejoradas», «premium» o «natural», aparecen aquí.',
+        ),
+      ),
+      h('div', { class: 'voice-pick' }, sel, test),
+    );
   }
 
   const isStandalone = () =>
@@ -3255,6 +3457,8 @@
       else setMsg('Se barajará un zapato nuevo antes de la próxima mano.');
       showTab('mesa');
     });
+    $('bank-btn').addEventListener('click', openBankDialog);
+    $('btn-bank-edit').addEventListener('click', openBankDialog);
     twoStep($('btn-bank'), 'Reiniciar banca', () => {
       state.bankroll = START_BANK;
       if (NET.role === 'host' && NET.mode === 'indiv') renderTable();
@@ -3278,7 +3482,13 @@
       onRuleChange('decks');
     });
 
-    $('opt-totals').addEventListener('change', (e) => {
+    $('flash-fb').addEventListener('click', () => {
+      clearTimeout(flashTimer);
+      $('flash-fb').hidden = true;
+    });
+
+    // El mismo ajuste desde la mesa, los ejercicios o Reglas.
+    for (const el of document.querySelectorAll('[data-totals]')) el.addEventListener('change', (e) => {
       settings.training.showTotals = e.target.checked;
       const f = TRAIN_FIELDS.find((x) => x.key === 'showTotals');
       seg('f-showTotals', 'f-showTotals', f.options, settings.training.showTotals, (v) => {
@@ -3287,6 +3497,7 @@
       });
       onTrainChange('showTotals');
     });
+    for (const el of document.querySelectorAll('[data-totals]')) el.checked = settings.training.showTotals;
 
     // Sonido: se activa con el primer toque (regla de los navegadores).
     buildSoundForm();

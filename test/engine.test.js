@@ -277,9 +277,15 @@ test('liquidación', () => {
 
 test('rampa de apuestas', () => {
   assert.equal(BJ.rampUnits(-2, 12), 1);
+  assert.equal(BJ.rampUnits(1, 12), 1);
   assert.equal(BJ.rampUnits(1.9, 12), 1);
-  assert.equal(BJ.rampUnits(3.2, 12), 2);
+  assert.equal(BJ.rampUnits(2, 12), 2);
+  assert.equal(BJ.rampUnits(2.7, 12), 2);
+  assert.equal(BJ.rampUnits(3.2, 12), 4);
+  assert.equal(BJ.rampUnits(5, 12), 8);
   assert.equal(BJ.rampUnits(20, 8), 8);
+  assert.equal(BJ.rampUnits(2, 12, 'soft'), 1);
+  assert.equal(BJ.rampUnits(3.2, 12, 'soft'), 2);
 });
 
 test('generadores de ejercicios producen manos válidas', () => {

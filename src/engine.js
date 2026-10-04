@@ -458,8 +458,14 @@
   }
 
   // Rampa de apuestas clásica para Hi-Lo: (TC − 1) unidades, mínimo 1.
-  function rampUnits(tc, maxSpread) {
-    const u = Math.floor(tc) - 1;
+  /*
+   * Rampa de apuestas con el true count redondeado hacia abajo.
+   * 'bja' (la de Blackjack Apprenticeship): mínima hasta TC +1; desde +2, (TC − 1) × 2 unidades.
+   * 'soft': (TC − 1) unidades, mínimo 1 (la primera subida llega en TC +3).
+   */
+  function rampUnits(tc, maxSpread, style) {
+    const t = Math.floor(tc + 1e-9);
+    const u = style === 'soft' ? t - 1 : (t - 1) * 2;
     return Math.max(1, Math.min(maxSpread, u));
   }
 
