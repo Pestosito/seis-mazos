@@ -21,7 +21,11 @@
       <button class="tab" role="tab" id="tab-tablas" data-tab="tablas" aria-controls="view-tablas" aria-selected="false">Tablas</button>
       <button class="tab" role="tab" id="tab-reglas" data-tab="reglas" aria-controls="view-reglas" aria-selected="false">Reglas</button>
     </nav>
-    <div class="bank"><button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
+    <div class="bank">
+      <button class="icon-btn" type="button" id="sound-btn" aria-label="Silenciar el sonido" title="Sonido">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>
+      </button>
+      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
   </header>
 
   <div class="install-banner" id="update-banner" hidden>
@@ -69,6 +73,7 @@
               <text class="p-band"><textPath href="#arc-c" startOffset="50%" text-anchor="middle">EL SEGURO PAGA 2 A 1</textPath></text>
             </svg>
             <div class="seats" id="seats"></div>
+            <div class="felt-banner" id="felt-banner" aria-hidden="true"></div>
           </div>
           <div class="dock">
             <div class="status">
@@ -249,6 +254,11 @@
             <p class="small muted" id="edge-text"></p>
           </div>
           <div class="panel">
+            <h2>Sonido y ambiente</h2>
+            <div id="sound-form"></div>
+            <p class="small muted">El sonido empieza al tocar la pantalla. En iPhone, con el interruptor de silencio activado no se oye nada.</p>
+          </div>
+          <div class="panel">
             <h2>Entrenamiento</h2>
             <div id="train-form"></div>
           </div>
@@ -275,6 +285,9 @@
 </div>
 
 <!--__VENDOR__-->
+<script>
+/*__AUDIO__*/
+</script>
 <script>
 /*__ENGINE__*/
 </script>

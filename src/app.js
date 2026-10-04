@@ -9,6 +9,8 @@
   const SPEEDS = { slow: 650, normal: 380, fast: 190, instant: 0 };
   const BOT_NAMES = ['Marta', 'Joel', 'Inés', 'Raúl'];
   const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
+  // Sonidos (audio.js). Si no está disponible, todas las llamadas se ignoran.
+  const SFX = window.SFX || new Proxy({}, { get: () => () => {} });
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -66,7 +68,12 @@
   const STORE = 'seis-mazos-v1';
   const DEFAULT_TRAINING = {
     useDeviations: true,
-    onMistake: 'retry',
+    onMistake: 'continue',
+    sound: true,
+    volume: 0.7,
+    ambience: 'music',
+    voice: false,
+    casino: true,
     quiz: 'every5',
     quizTC: true,
     showTags: false,
@@ -81,6 +88,7 @@
     showHud: false,
   };
   const START_BANK = 5000;
+  const SETTINGS_VERSION = 2;
   const emptyStats = () => ({
     hands: 0,
     decisions: 0,
@@ -115,6 +123,7 @@
       stats,
       drills,
       tab: state.tab,
+      settingsVersion: SETTINGS_VERSION,
       token: state.token,
     };
   }
@@ -148,6 +157,8 @@
       };
     }
     if (data.tab) state.tab = data.tab;
+    // v2: los errores se juegan por defecto (antes había que corregirlos para seguir).
+    if ((data.settingsVersion || 1) < 2) settings.training.onMistake = 'continue';
     if (typeof data.token === 'string') state.token = data.token;
   }
 
@@ -481,6 +492,10 @@
     const dt = $('dealer-total');
     const visible = m.dealer.filter((c) => !c.down);
     T.paintOver = !!m.over;
+    if (m.over && !T.overSeen) {
+      T.overSeen = true;
+      if (BJ.handValue(m.dealer.filter((c) => !c.down)).total > 21) SFX.say('El crupier se pasa.');
+    } else if (!m.over) T.overSeen = false;
     dt.hidden = !m.dealer.length || !(settings.training.showTotals || m.over);
     if (visible.length) dt.textContent = totalText(visible);
     syncChildren($('seats'), m.seats.map(seatNode));
@@ -496,6 +511,66 @@
     if (!t.pid) return `Juega ${t.name}.`;
     const sit = settings.training.showTotals ? `${t.hand} contra ${t.up}` : `el crupier muestra ${t.up}`;
     return t.pid === myId() ? `Tu turno: ${sit}.` : `Turno de ${t.name}: ${sit}.`;
+  }
+
+  /* ---------- Efectos de casino: fichas que vuelan, letrero de blackjack ---------- */
+  function flyChips(fromEl, toEl, count, value) {
+    if (reducedMotion || !fromEl || !toEl || !fromEl.animate) return;
+    const a = fromEl.getBoundingClientRect();
+    const b = toEl.getBoundingClientRect();
+    if (!a.width || !b.width) return;
+    for (let i = 0; i < count; i++) {
+      const c = h('div', { class: 'chip fly-chip', 'data-v': value });
+      const x0 = a.left + a.width / 2 - 15 + (Math.random() * 40 - 20);
+      const y0 = a.top + a.height / 2 - 15;
+      const x1 = b.left + b.width / 2 - 15 + (Math.random() * 10 - 5);
+      const y1 = b.top + b.height / 2 - 15 - i * 3;
+      c.style.left = x0 + 'px';
+      c.style.top = y0 + 'px';
+      document.body.appendChild(c);
+      const fly = c.animate(
+        [
+          { transform: 'translate(0, 0) scale(0.7)', opacity: 0 },
+          { opacity: 1, offset: 0.2 },
+          { transform: `translate(${x1 - x0}px, ${y1 - y0}px) scale(1)`, opacity: 1 },
+        ],
+        { duration: 520 + i * 60, delay: i * 55, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' },
+      );
+      fly.onfinish = () => {
+        const out = c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, delay: 450, fill: 'forwards' });
+        out.onfinish = () => c.remove();
+      };
+    }
+  }
+
+  function showBanner(text) {
+    const b = $('felt-banner');
+    b.textContent = text;
+    b.classList.remove('show');
+    void b.offsetWidth;
+    b.classList.add('show');
+  }
+
+  function resultFx(kind, n) {
+    const dealer = $('dealer-cards');
+    const spot = n.root.querySelector('.spot');
+    if (kind === 'bj') {
+      SFX.blackjack();
+      SFX.say('¡Blackjack!');
+      showBanner('BLACKJACK');
+      flyChips(dealer, spot, 8, 100);
+    } else if (kind === 'win' || kind === 'even') {
+      SFX.win();
+      flyChips(dealer, spot, 5, 25);
+    } else if (kind === 'lose' || kind === 'bust' || kind === 'surrender') {
+      SFX.lose();
+      flyChips(spot, dealer, kind === 'surrender' ? 1 : 3, 25);
+    } else SFX.push();
+    if (kind === 'bj' || kind === 'win' || kind === 'even') {
+      n.root.classList.remove('won');
+      void n.root.offsetWidth;
+      n.root.classList.add('won');
+    }
   }
 
   /* ---------- Render de cartas, manos y asientos ---------- */
@@ -514,6 +589,7 @@
       }
       el.classList.remove('down');
       flipIn(el);
+      SFX.flip();
     }
     el.setAttribute('aria-label', cv.down ? 'Carta boca abajo' : cardName(cv));
     return el;
@@ -527,6 +603,7 @@
       if (el._fresh) {
         el._fresh = false;
         animateFrom(el, shoe);
+        SFX.card();
       }
   }
 
@@ -568,6 +645,14 @@
     n.root.classList.toggle('active', !!hv.active);
     n.total.hidden = hv.cards.length === 0 || !(settings.training.showTotals || hv.result || T.paintOver);
     n.total.textContent = hv.natural ? 'BJ' : hv.cards.length ? totalText(hv.cards) : '';
+    if (hv.result && !n.celebrated) {
+      n.celebrated = true;
+      if (seat.pid && seat.pid === myId()) resultFx(hv.result.result, n);
+    }
+    if (hv.doubled && !n.doubledFx) {
+      n.doubledFx = true;
+      SFX.chip(2);
+    }
     if (hv.result) {
       const r = hv.result;
       n.res.hidden = false;
@@ -614,6 +699,11 @@
   function renderShoe(m) {
     const s = m && m.shoe;
     if (!s) return;
+    if (T.seenRemaining != null && s.remaining > T.seenRemaining + 4) {
+      SFX.shuffle();
+      SFX.say('Barajando. Hagan sus apuestas.');
+    }
+    T.seenRemaining = s.remaining;
     if (T.tickDecks !== s.decks) buildTrayTicks(s.decks);
     $('shoe-fill').style.height = (s.remaining / s.size) * 100 + '%';
     $('shoe-cut').style.bottom = ((s.size - s.cutIndex) / s.size) * 100 + '%';
@@ -762,6 +852,7 @@
             'aria-label': `Añadir ${v}`,
             onclick: () => {
               T.bet += v;
+              SFX.chip(1);
               renderControls();
             },
           },
@@ -787,6 +878,7 @@
             class: 'btn small ghost',
             type: 'button',
             onclick: () => {
+              if (T.bet) SFX.chip(3);
               T.bet = 0;
               renderControls();
             },
@@ -825,6 +917,10 @@
       );
     } else if (p.kind === 'insurance') {
       const bet = p.data.bet;
+      if (!p.said) {
+        p.said = true;
+        SFX.say(p.data.natural ? '¿Pago igual?' : '¿Seguro?');
+      }
       box.append(
         h('span', null, p.data.natural ? '¿Aceptas pago igual (1 a 1)?' : `¿Seguro por ${money(bet / 2)}?`),
         h('button', { class: 'btn', type: 'button', onclick: () => p.resolve('I') }, 'Sí', h('kbd', null, 'S')),
@@ -837,9 +933,9 @@
       );
     } else if (p.kind === 'quiz') {
       const rc = stepper('quiz-rc', 0, 1);
-      const tc = p.data.askTC ? stepper('quiz-tc', 0, 1) : null;
+      const tc = p.data.askTC ? stepper('quiz-tc', 0, 0.5, true) : null;
       const submit = () => {
-        const a = { rc: Math.round(Number(rc.input.value) || 0), tc: tc ? Number(tc.input.value) || 0 : null };
+        const a = { rc: Math.round(rc.value()), tc: tc ? tc.value() : null };
         p.resolve(a);
       };
       box.append(
@@ -863,19 +959,33 @@
     }
   }
 
-  function stepper(id, value, step) {
-    const input = h('input', { id, type: 'number', inputmode: 'numeric', step: 'any', value: String(value) });
-    const bump = (d) => {
-      input.value = String(Math.round(((Number(input.value) || 0) + d) * 10) / 10);
+  // Lee un número escrito a mano: acepta coma o punto decimal y el signo menos tipográfico.
+  function parseNum(text) {
+    const v = Number(String(text || '').trim().replace(',', '.').replace(/[−–]/g, '-'));
+    return isFinite(v) ? v : 0;
+  }
+  // Campo numérico con − / + y ± (el teclado decimal del iPhone no tiene signo menos).
+  function stepper(id, value, step, decimals) {
+    const input = h('input', {
+      id,
+      type: 'text',
+      inputmode: decimals ? 'decimal' : 'numeric',
+      autocomplete: 'off',
+      value: String(value),
+    });
+    const set = (v) => {
+      input.value = String(Math.round(v * 10) / 10);
     };
     const root = h(
       'div',
       { class: 'stepper' },
-      h('button', { type: 'button', 'aria-label': 'Restar', onclick: () => bump(-step) }, '−'),
+      h('button', { type: 'button', 'aria-label': 'Cambiar signo', class: 'sign', onclick: () => set(-parseNum(input.value)) }, '±'),
+      h('button', { type: 'button', 'aria-label': 'Restar', onclick: () => set(parseNum(input.value) - step) }, '−'),
       input,
-      h('button', { type: 'button', 'aria-label': 'Sumar', onclick: () => bump(step) }, '+'),
+      h('button', { type: 'button', 'aria-label': 'Sumar', onclick: () => set(parseNum(input.value) + step) }, '+'),
     );
-    return { root, input };
+    input.addEventListener('focus', () => input.select());
+    return { root, input, value: () => parseNum(input.value) };
   }
 
   /* ---------- Panel lateral ---------- */
@@ -887,6 +997,10 @@
       lines && lines.length ? h('ul', { class: 'why' }, lines.map((l) => h('li', { html: l }))) : null,
     );
     if (box.id === 'feedback' && !(quiet && verdict === 'ok')) flashFeedback(verdict, mark, title, lines);
+    else if (box.id !== 'feedback') {
+      if (verdict === 'ok') SFX.good();
+      else if (verdict === 'bad') SFX.bad();
+    }
   }
 
   // Corrección al instante, justo encima de los botones de la mesa (visible también en el teléfono).
@@ -901,6 +1015,8 @@
     );
     el.className = 'flash-fb ' + verdict;
     el.hidden = false;
+    if (verdict === 'ok') SFX.good();
+    else if (verdict === 'bad') SFX.bad();
     el.classList.remove('pop');
     void el.offsetWidth;
     el.classList.add('pop');
@@ -2004,6 +2120,8 @@
     SD.answered = false;
     $('sd-up').replaceChildren(makeCardEl(sc.upCard));
     const handEls = sc.cards.map((c) => makeCardEl(c));
+    SFX.card();
+    setTimeout(() => SFX.card(), 110);
     $('sd-hand').replaceChildren(...handEls);
     handEls.forEach((el) => animateFrom(el, null));
     $('sd-total').textContent = totalText(sc.cards);
@@ -2156,7 +2274,7 @@
             class: 'quiz',
             onsubmit: (e) => {
               e.preventDefault();
-              dvAnswer(Math.round(Number(st.input.value) || 0));
+              dvAnswer(Math.round(st.value()));
             },
           },
           h('label', { class: 'field' }, 'Índice', st.root),
@@ -2336,6 +2454,7 @@
     const els = group.map((c) => makeCardEl(c));
     $('cd-flash').replaceChildren(...els);
     if (CD.speed >= 0.35) els.forEach((el) => animateFrom(el, null));
+    SFX.card();
     $('cd-progress').style.width = (CD.i / CD.seq.length) * 100 + '%';
     CD.timer = setTimeout(cdTick, CD.speed * 1000);
   }
@@ -2360,7 +2479,7 @@
             class: 'quiz',
             onsubmit: (e) => {
               e.preventDefault();
-              cdCheck(Math.round(Number(st.input.value) || 0));
+              cdCheck(Math.round(st.value()));
             },
           },
           h('label', { class: 'field' }, 'Running count', st.root),
@@ -2435,7 +2554,7 @@
       ),
     );
     $('cd-prompt').textContent = `Zapato de ${decks} mazos. Mira la bandeja, estima los mazos que quedan y calcula el true count.`;
-    const st = stepper('cd-tc', 0, 0.5);
+    const st = stepper('cd-tc', 0, 0.5, true);
     $('cd-actions').replaceChildren(
       h(
         'form',
@@ -2443,7 +2562,7 @@
           class: 'quiz',
           onsubmit: (e) => {
             e.preventDefault();
-            cdTcCheck(Number(st.input.value) || 0);
+            cdTcCheck(st.value());
           },
         },
         h('label', { class: 'field' }, 'True count', st.root),
@@ -2681,7 +2800,7 @@
       hint: 'Con desviaciones, la jugada correcta depende del true count.',
       options: [[true, 'Básica + desviaciones'], [false, 'Solo básica']],
     },
-    { key: 'onMistake', label: 'Si te equivocas', options: [['retry', 'Corriges antes de seguir'], ['continue', 'Se juega igual']] },
+    { key: 'onMistake', label: 'Si te equivocas', hint: 'Siempre te avisa; aquí eliges si la jugada equivocada se juega.', options: [['continue', 'Se juega igual'], ['retry', 'Corriges antes de seguir']] },
     {
       key: 'quiz',
       label: 'Preguntar el conteo',
@@ -2892,6 +3011,51 @@
     }
   }
 
+  /* ---------- Sonido y ambiente ---------- */
+  function applyAudio() {
+    const t = settings.training;
+    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice });
+    document.documentElement.classList.toggle('casino', !!t.casino);
+    const btn = $('sound-btn');
+    btn.classList.toggle('muted', !t.sound);
+    btn.setAttribute('aria-label', t.sound ? 'Silenciar el sonido' : 'Activar el sonido');
+    btn.hidden = !SFX.supported;
+  }
+
+  const SOUND_FIELDS = [
+    { key: 'sound', label: 'Sonido', options: [[true, 'Activado'], [false, 'Silencio']] },
+    {
+      key: 'ambience',
+      label: 'Ambiente de sala',
+      hint: 'Murmullo, fichas y tragamonedas a lo lejos; con música lounge si quieres.',
+      options: [['off', 'Apagado'], ['room', 'Murmullo'], ['music', 'Murmullo y música']],
+    },
+    { key: 'voice', label: 'Voz del crupier', hint: '«¡Blackjack!», «El crupier se pasa», «Barajando»…', options: [[false, 'No'], [true, 'Sí']] },
+    { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
+  ];
+
+  function buildSoundForm() {
+    buildForm('sound-form', SOUND_FIELDS, settings.training, () => {
+      applyAudio();
+      save();
+    });
+    const vol = h('input', { id: 'f-volume', type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(settings.training.volume * 100)) });
+    const out = h('span', { class: 'num small' }, `${Math.round(settings.training.volume * 100)}%`);
+    vol.addEventListener('input', () => {
+      settings.training.volume = Number(vol.value) / 100;
+      out.textContent = `${vol.value}%`;
+      applyAudio();
+    });
+    vol.addEventListener('change', () => {
+      SFX.chip(2);
+      save();
+    });
+    $('sound-form').insertBefore(
+      h('div', { class: 'setting' }, h('div', null, h('span', null, 'Volumen')), h('label', { class: 'range' }, vol, out)),
+      $('sound-form').children[1],
+    );
+  }
+
   const isStandalone = () =>
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 
@@ -3087,6 +3251,29 @@
         onTrainChange('showTotals');
       });
       onTrainChange('showTotals');
+    });
+
+    // Sonido: se activa con el primer toque (regla de los navegadores).
+    buildSoundForm();
+    applyAudio();
+    const unlock = () => {
+      SFX.unlock();
+      applyAudio();
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+    $('sound-btn').addEventListener('click', () => {
+      settings.training.sound = !settings.training.sound;
+      applyAudio();
+      buildSoundForm();
+      if (settings.training.sound) SFX.chip(2);
+      save();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') SFX.pause();
+      else SFX.resume();
     });
 
     // En línea e instalación

@@ -10,7 +10,7 @@ const read = (p) => readFileSync(url(p), 'utf8');
 
 // Versión: huella de las fuentes; se muestra en Reglas → Mantenimiento y nombra la caché.
 const version = createHash('sha256')
-  .update(['template.html', 'styles.css', 'engine.js', 'app.js', 'sw.js', 'vendor/mqtt.min.js'].map((f) => read('./src/' + f)).join('\n'))
+  .update(['template.html', 'styles.css', 'audio.js', 'engine.js', 'app.js', 'sw.js', 'vendor/mqtt.min.js'].map((f) => read('./src/' + f)).join('\n'))
   .digest('hex')
   .slice(0, 8);
 
@@ -20,6 +20,7 @@ function page({ head = '', vendor = '' } = {}) {
     .replace('<!--__HEAD__-->', () => head)
     .replace('<!--__VENDOR__-->', () => vendor)
     .replace('/*__CSS__*/', () => read('./src/styles.css'))
+    .replace('/*__AUDIO__*/', () => read('./src/audio.js'))
     .replace('/*__ENGINE__*/', () => read('./src/engine.js'))
     .replace('/*__APP__*/', () => read('./src/app.js'));
 }

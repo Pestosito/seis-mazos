@@ -118,6 +118,97 @@
   color-scheme: dark;
 }
 
+/* Ambiente visual «casino»: sala oscura y cálida, sea cual sea el tema del teléfono.
+   :root.casino:not(.x) tiene más especificidad que los bloques de tema oscuro/claro. */
+:root.casino:not(.x) {
+  --paper: #0c0907;
+  --panel: #18120e;
+  --panel-2: #211a15;
+  --ink: #f2e9da;
+  --muted: #ab9b8b;
+  --line: #352a21;
+  --felt: #106049;
+  --felt-deep: #073a2c;
+  --felt-ink: #ecdcb2;
+  --felt-gold: #ecc066;
+  --rail: #2b170c;
+  --rail-hi: #4d2d18;
+  --brass: #d9aa58;
+  --brass-soft: #3d301a;
+  --brass-ink: #f7e7c2;
+  --card: #f6f1e5;
+  --back: #6d1828;
+  --back-line: #9c344b;
+  --ok: #67cf95;
+  --ok-bg: #11301f;
+  --bad: #f2907f;
+  --bad-bg: #3b1814;
+  --warn: #e8bd63;
+  --warn-bg: #36290f;
+  --a-h: #6d3a31;
+  --a-s: #6a5724;
+  --a-d: #24576b;
+  --a-p: #4c3c75;
+  --a-r: #3d4148;
+  --a-ink: #f4f1ea;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 26px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+:root.casino body::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 16%, rgb(255 196 100 / 0.22) 0 2.5%, transparent 8%),
+    radial-gradient(circle at 88% 10%, rgb(255 120 80 / 0.16) 0 3.5%, transparent 10%),
+    radial-gradient(circle at 74% 64%, rgb(190 120 255 / 0.1) 0 4%, transparent 11%),
+    radial-gradient(circle at 22% 78%, rgb(255 210 120 / 0.13) 0 3%, transparent 10%),
+    radial-gradient(circle at 46% 30%, rgb(255 170 80 / 0.07) 0 7%, transparent 18%),
+    radial-gradient(circle at 92% 86%, rgb(255 190 110 / 0.12) 0 2.5%, transparent 9%),
+    radial-gradient(ellipse at 50% -5%, rgb(255 200 120 / 0.12), transparent 55%);
+  filter: blur(16px);
+  animation: bokeh 40s ease-in-out infinite alternate;
+}
+:root.casino body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 40%, transparent 50%, rgb(0 0 0 / 0.55));
+}
+@keyframes bokeh {
+  to {
+    transform: translate3d(2.5%, -3%, 0) scale(1.07);
+  }
+}
+:root.casino .felt {
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--brass) 55%, transparent),
+    inset 0 18px 40px rgb(0 0 0 / 0.22),
+    0 0 0 1px var(--rail-hi),
+    0 30px 80px rgb(0 0 0 / 0.6),
+    0 0 140px rgb(255 190 100 / 0.09);
+}
+:root.casino .felt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 60% at 50% -8%, rgb(255 228 170 / 0.24), transparent 70%);
+}
+:root.casino .brand h1 {
+  background: linear-gradient(180deg, var(--felt-gold), var(--brass));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -747,6 +838,108 @@ button.chip:active {
 .status .rules-line {
   color: var(--muted);
   font-size: 0.78rem;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+  margin-right: 4px;
+}
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn .spk {
+  fill: currentColor;
+}
+.icon-btn .mute,
+.icon-btn.muted .wave {
+  display: none;
+}
+.icon-btn.muted .mute {
+  display: inline;
+}
+.icon-btn.muted {
+  color: var(--muted);
+}
+.stepper button.sign {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.fly-chip {
+  position: fixed;
+  z-index: 60;
+  width: 30px;
+  pointer-events: none;
+  margin: 0;
+}
+.felt-banner {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(28px, 7.5vw, 60px);
+  letter-spacing: 0.12em;
+  color: var(--felt-gold);
+  text-shadow:
+    0 0 22px color-mix(in srgb, var(--felt-gold) 70%, transparent),
+    0 2px 0 rgb(0 0 0 / 0.45);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0.25em 0.9em;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.5) 55%, transparent 75%);
+}
+.felt-banner.show {
+  animation: banner 2s ease-out both;
+}
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62%) scale(1);
+  }
+}
+.hand.won {
+  animation: won 1.4s ease-out;
+}
+@keyframes won {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  30% {
+    box-shadow: 0 0 0 3px var(--felt-gold), 0 0 36px color-mix(in srgb, var(--felt-gold) 60%, transparent);
+  }
 }
 .flash-fb {
   display: flex;
@@ -1645,8 +1838,24 @@ table.score tr.total td {
   .card.deal-in,
   .card.flip,
   .flash-fb.pop,
-  td.h17diff.pulse {
+  td.h17diff.pulse,
+  .hand.won {
     animation: none;
+  }
+  :root.casino body::before {
+    animation: none;
+  }
+  .felt-banner.show {
+    animation: banner-still 2s linear both;
+  }
+  @keyframes banner-still {
+    0%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
   .btn,
   button.chip,

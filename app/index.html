@@ -138,6 +138,97 @@
   color-scheme: dark;
 }
 
+/* Ambiente visual «casino»: sala oscura y cálida, sea cual sea el tema del teléfono.
+   :root.casino:not(.x) tiene más especificidad que los bloques de tema oscuro/claro. */
+:root.casino:not(.x) {
+  --paper: #0c0907;
+  --panel: #18120e;
+  --panel-2: #211a15;
+  --ink: #f2e9da;
+  --muted: #ab9b8b;
+  --line: #352a21;
+  --felt: #106049;
+  --felt-deep: #073a2c;
+  --felt-ink: #ecdcb2;
+  --felt-gold: #ecc066;
+  --rail: #2b170c;
+  --rail-hi: #4d2d18;
+  --brass: #d9aa58;
+  --brass-soft: #3d301a;
+  --brass-ink: #f7e7c2;
+  --card: #f6f1e5;
+  --back: #6d1828;
+  --back-line: #9c344b;
+  --ok: #67cf95;
+  --ok-bg: #11301f;
+  --bad: #f2907f;
+  --bad-bg: #3b1814;
+  --warn: #e8bd63;
+  --warn-bg: #36290f;
+  --a-h: #6d3a31;
+  --a-s: #6a5724;
+  --a-d: #24576b;
+  --a-p: #4c3c75;
+  --a-r: #3d4148;
+  --a-ink: #f4f1ea;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 26px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+:root.casino body::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 16%, rgb(255 196 100 / 0.22) 0 2.5%, transparent 8%),
+    radial-gradient(circle at 88% 10%, rgb(255 120 80 / 0.16) 0 3.5%, transparent 10%),
+    radial-gradient(circle at 74% 64%, rgb(190 120 255 / 0.1) 0 4%, transparent 11%),
+    radial-gradient(circle at 22% 78%, rgb(255 210 120 / 0.13) 0 3%, transparent 10%),
+    radial-gradient(circle at 46% 30%, rgb(255 170 80 / 0.07) 0 7%, transparent 18%),
+    radial-gradient(circle at 92% 86%, rgb(255 190 110 / 0.12) 0 2.5%, transparent 9%),
+    radial-gradient(ellipse at 50% -5%, rgb(255 200 120 / 0.12), transparent 55%);
+  filter: blur(16px);
+  animation: bokeh 40s ease-in-out infinite alternate;
+}
+:root.casino body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 40%, transparent 50%, rgb(0 0 0 / 0.55));
+}
+@keyframes bokeh {
+  to {
+    transform: translate3d(2.5%, -3%, 0) scale(1.07);
+  }
+}
+:root.casino .felt {
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--brass) 55%, transparent),
+    inset 0 18px 40px rgb(0 0 0 / 0.22),
+    0 0 0 1px var(--rail-hi),
+    0 30px 80px rgb(0 0 0 / 0.6),
+    0 0 140px rgb(255 190 100 / 0.09);
+}
+:root.casino .felt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 60% at 50% -8%, rgb(255 228 170 / 0.24), transparent 70%);
+}
+:root.casino .brand h1 {
+  background: linear-gradient(180deg, var(--felt-gold), var(--brass));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -767,6 +858,108 @@ button.chip:active {
 .status .rules-line {
   color: var(--muted);
   font-size: 0.78rem;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+  margin-right: 4px;
+}
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-btn .spk {
+  fill: currentColor;
+}
+.icon-btn .mute,
+.icon-btn.muted .wave {
+  display: none;
+}
+.icon-btn.muted .mute {
+  display: inline;
+}
+.icon-btn.muted {
+  color: var(--muted);
+}
+.stepper button.sign {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.fly-chip {
+  position: fixed;
+  z-index: 60;
+  width: 30px;
+  pointer-events: none;
+  margin: 0;
+}
+.felt-banner {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(28px, 7.5vw, 60px);
+  letter-spacing: 0.12em;
+  color: var(--felt-gold);
+  text-shadow:
+    0 0 22px color-mix(in srgb, var(--felt-gold) 70%, transparent),
+    0 2px 0 rgb(0 0 0 / 0.45);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0.25em 0.9em;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.5) 55%, transparent 75%);
+}
+.felt-banner.show {
+  animation: banner 2s ease-out both;
+}
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62%) scale(1);
+  }
+}
+.hand.won {
+  animation: won 1.4s ease-out;
+}
+@keyframes won {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  30% {
+    box-shadow: 0 0 0 3px var(--felt-gold), 0 0 36px color-mix(in srgb, var(--felt-gold) 60%, transparent);
+  }
 }
 .flash-fb {
   display: flex;
@@ -1665,8 +1858,24 @@ table.score tr.total td {
   .card.deal-in,
   .card.flip,
   .flash-fb.pop,
-  td.h17diff.pulse {
+  td.h17diff.pulse,
+  .hand.won {
     animation: none;
+  }
+  :root.casino body::before {
+    animation: none;
+  }
+  .felt-banner.show {
+    animation: banner-still 2s linear both;
+  }
+  @keyframes banner-still {
+    0%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
   .btn,
   button.chip,
@@ -1692,7 +1901,11 @@ table.score tr.total td {
       <button class="tab" role="tab" id="tab-tablas" data-tab="tablas" aria-controls="view-tablas" aria-selected="false">Tablas</button>
       <button class="tab" role="tab" id="tab-reglas" data-tab="reglas" aria-controls="view-reglas" aria-selected="false">Reglas</button>
     </nav>
-    <div class="bank"><button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
+    <div class="bank">
+      <button class="icon-btn" type="button" id="sound-btn" aria-label="Silenciar el sonido" title="Sonido">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>
+      </button>
+      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
   </header>
 
   <div class="install-banner" id="update-banner" hidden>
@@ -1740,6 +1953,7 @@ table.score tr.total td {
               <text class="p-band"><textPath href="#arc-c" startOffset="50%" text-anchor="middle">EL SEGURO PAGA 2 A 1</textPath></text>
             </svg>
             <div class="seats" id="seats"></div>
+            <div class="felt-banner" id="felt-banner" aria-hidden="true"></div>
           </div>
           <div class="dock">
             <div class="status">
@@ -1920,6 +2134,11 @@ table.score tr.total td {
             <p class="small muted" id="edge-text"></p>
           </div>
           <div class="panel">
+            <h2>Sonido y ambiente</h2>
+            <div id="sound-form"></div>
+            <p class="small muted">El sonido empieza al tocar la pantalla. En iPhone, con el interruptor de silencio activado no se oye nada.</p>
+          </div>
+          <div class="panel">
             <h2>Entrenamiento</h2>
             <div id="train-form"></div>
           </div>
@@ -1931,7 +2150,7 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">0c408e7b</span></p>
+            <p class="small muted">Versión <span class="num">6b15d4d9</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
@@ -1946,6 +2165,426 @@ table.score tr.total td {
 </div>
 
 <script src="mqtt.min.js"></script>
+<script>
+/*
+ * Seis Mazos — sonidos y ambiente de casino generados con Web Audio (sin archivos de audio).
+ * Expone window.SFX. Nada suena hasta que la persona toca la pantalla (regla de los navegadores).
+ */
+(function (root) {
+  'use strict';
+  const AC = root.AudioContext || root.webkitAudioContext;
+  const S = { enabled: true, volume: 0.7, ambience: 'music', voice: false };
+  let ctx = null;
+  let master;
+  let fx;
+  let amb;
+  let music;
+  let verb;
+  let noise;
+  let unlocked = false;
+  let ambience = null; // nodos y temporizadores del ambiente activo
+  let lastCard = 0;
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const now = () => ctx.currentTime;
+  const ready = () => ctx && unlocked && S.enabled && ctx.state === 'running';
+
+  function init() {
+    if (ctx || !AC) return ctx;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = S.enabled ? S.volume : 0;
+    master.connect(ctx.destination);
+    // Sala: reverberación sintética para que el ambiente y la música suenen "en el salón".
+    verb = ctx.createConvolver();
+    verb.buffer = impulse(2.2, 2.8);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.32;
+    verb.connect(wet);
+    wet.connect(master);
+    fx = bus(1, 0.15);
+    amb = bus(0.6, 0.7);
+    music = bus(0.55, 0.45);
+    noise = noiseBuffer(3);
+    return ctx;
+  }
+
+  function bus(level, send) {
+    const g = ctx.createGain();
+    g.gain.value = level;
+    g.connect(master);
+    if (send) {
+      const s = ctx.createGain();
+      s.gain.value = send;
+      g.connect(s);
+      s.connect(verb);
+    }
+    return g;
+  }
+
+  function impulse(seconds, decay) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+
+  function noiseBuffer(seconds) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    // Ruido rosado aproximado (filtro de Paul Kellet): más natural que el blanco.
+    let b0 = 0;
+    let b1 = 0;
+    let b2 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99765 * b0 + w * 0.099046;
+      b1 = 0.963 * b1 + w * 0.2965164;
+      b2 = 0.57 * b2 + w * 1.0526913;
+      d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2;
+    }
+    return buf;
+  }
+
+  function filter(type, freq, q) {
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q == null ? 0.7 : q;
+    return f;
+  }
+
+  // Nota con envolvente percusiva.
+  function tone(o) {
+    const t = o.t == null ? now() : o.t;
+    const osc = ctx.createOscillator();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(o.freq, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + (o.d || 0.2));
+    const g = ctx.createGain();
+    const a = o.a || 0.004;
+    const d = o.d || 0.2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.peak || 0.2, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    let node = osc;
+    if (o.lp) {
+      const f = filter('lowpass', o.lp);
+      osc.connect(f);
+      node = f;
+    }
+    node.connect(g);
+    g.connect(o.dest || fx);
+    osc.start(t);
+    osc.stop(t + a + d + 0.05);
+  }
+
+  // Ráfaga de ruido filtrado (cartas, fichas, platillos).
+  function burst(o) {
+    const t = o.t == null ? now() : o.t;
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.playbackRate.value = o.rate || 1;
+    const f = filter(o.type || 'bandpass', o.freq || 3000, o.q == null ? 1 : o.q);
+    const g = ctx.createGain();
+    const dur = o.dur || 0.06;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.peak || 0.2, t + (o.a || 0.003));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f);
+    f.connect(g);
+    g.connect(o.dest || fx);
+    src.start(t, rand(0, 2.5), dur + 0.05);
+  }
+
+  /* ---------- Efectos ---------- */
+  const fxs = {
+    card() {
+      const n = performance.now();
+      if (n - lastCard < 45) return;
+      lastCard = n;
+      const t = now();
+      burst({ t, dur: 0.075, freq: rand(2300, 3300), q: 0.8, peak: 0.2 });
+      burst({ t: t + 0.055, dur: 0.05, freq: 700, type: 'lowpass', peak: 0.16 });
+    },
+    flip() {
+      const t = now();
+      burst({ t, dur: 0.04, freq: 3400, peak: 0.13 });
+      burst({ t: t + 0.06, dur: 0.06, freq: 2100, peak: 0.14 });
+    },
+    chip(n) {
+      const count = n || 1;
+      for (let i = 0; i < count; i++) {
+        const t = now() + i * rand(0.04, 0.07);
+        tone({ t, freq: rand(2900, 3400), type: 'triangle', d: 0.05, peak: 0.16 });
+        tone({ t, freq: rand(4700, 5300), d: 0.035, peak: 0.07 });
+        burst({ t, dur: 0.025, freq: 5200, q: 2, peak: 0.11 });
+      }
+    },
+    shuffle() {
+      const t0 = now();
+      for (let i = 0; i < 46; i++) {
+        const t = t0 + Math.pow(i / 46, 0.85) * 1.15;
+        burst({ t, dur: 0.028, freq: rand(3200, 5200), q: 1.4, peak: rand(0.05, 0.11) });
+      }
+      burst({ t: t0 + 1.2, dur: 0.4, freq: 1400, q: 0.5, peak: 0.14, a: 0.05 });
+    },
+    win() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ t: now() + i * 0.085, freq: f, type: 'triangle', d: 0.55, peak: 0.13 }));
+      setTimeout(() => ready() && fxs.chip(4), 260);
+    },
+    blackjack() {
+      [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568].forEach((f, i) =>
+        tone({ t: now() + i * 0.07, freq: f, type: 'triangle', d: 0.7, peak: 0.13 }),
+      );
+      for (let i = 0; i < 8; i++) tone({ t: now() + 0.45 + i * 0.05, freq: rand(2500, 4200), d: 0.25, peak: 0.04 });
+      setTimeout(() => ready() && fxs.chip(7), 380);
+    },
+    lose() {
+      tone({ freq: 392, to: 330, type: 'square', lp: 900, d: 0.32, peak: 0.07 });
+      tone({ t: now() + 0.16, freq: 311, to: 262, type: 'square', lp: 800, d: 0.42, peak: 0.06 });
+    },
+    push() {
+      tone({ freq: 587.33, type: 'triangle', d: 0.3, peak: 0.1 });
+    },
+    good() {
+      tone({ freq: 1318.5, d: 0.25, peak: 0.1 });
+      tone({ t: now() + 0.07, freq: 1760, d: 0.32, peak: 0.07 });
+    },
+    bad() {
+      tone({ freq: 196, type: 'sawtooth', lp: 650, d: 0.22, peak: 0.12 });
+      tone({ t: now() + 0.13, freq: 175, type: 'sawtooth', lp: 600, d: 0.3, peak: 0.1 });
+    },
+  };
+
+  /* ---------- Ambiente de sala ---------- */
+  function loopNoise(rate) {
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.loop = true;
+    src.playbackRate.value = rate || 1;
+    src.start(now(), rand(0, 2));
+    return src;
+  }
+
+  function startAmbience() {
+    if (ambience || !ready() || S.ambience === 'off') return;
+    const nodes = [];
+    const timers = [];
+    // Murmullo de la sala: ruido grave que crece y baja despacio.
+    const bed = loopNoise(0.9);
+    const bedBp = filter('bandpass', 420, 0.55);
+    const bedLp = filter('lowpass', 1300);
+    const bedGain = ctx.createGain();
+    bedGain.gain.value = 0.07;
+    bed.connect(bedBp);
+    bedBp.connect(bedLp);
+    bedLp.connect(bedGain);
+    bedGain.connect(amb);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.06;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.025;
+    lfo.connect(lfoGain);
+    lfoGain.connect(bedGain.gain);
+    lfo.start();
+    nodes.push(bed, lfo);
+    // Conversaciones: sílabas de ruido con formantes que cambian.
+    const chat = loopNoise(1.25);
+    const chatBp = filter('bandpass', 1000, 3.5);
+    const chatGain = ctx.createGain();
+    chatGain.gain.value = 0.0001;
+    chat.connect(chatBp);
+    chatBp.connect(chatGain);
+    chatGain.connect(amb);
+    nodes.push(chat);
+    timers.push(
+      setInterval(() => {
+        if (!ready()) return;
+        const t = now();
+        chatBp.frequency.setTargetAtTime(rand(650, 1700), t, 0.04);
+        const peak = Math.random() < 0.3 ? 0.0001 : rand(0.008, 0.026);
+        chatGain.gain.setTargetAtTime(peak, t, 0.05);
+      }, 170),
+    );
+    // Sonidos lejanos del casino.
+    const distant = () => {
+      if (ready()) {
+        const r = Math.random();
+        const t = now();
+        if (r < 0.4) {
+          // tragamonedas pagando
+          const notes = [1046.5, 1318.5, 1568, 2093, 1568, 2093, 2637];
+          notes.forEach((f, i) => tone({ t: t + i * 0.075, freq: f, type: 'square', lp: 2600, d: 0.09, peak: 0.018, dest: amb }));
+        } else if (r < 0.75) {
+          for (let i = 0; i < 6; i++) {
+            const tt = t + i * rand(0.04, 0.09);
+            tone({ t: tt, freq: rand(2800, 3500), type: 'triangle', d: 0.05, peak: 0.03, dest: amb });
+            burst({ t: tt, dur: 0.02, freq: 5000, q: 2, peak: 0.02, dest: amb });
+          }
+        } else {
+          tone({ t, freq: 1568, d: 1.2, peak: 0.02, dest: amb });
+          tone({ t: t + 0.18, freq: 2093, d: 1.4, peak: 0.016, dest: amb });
+        }
+      }
+      timers.push(setTimeout(distant, rand(5000, 13000)));
+    };
+    timers.push(setTimeout(distant, rand(2000, 5000)));
+    ambience = { nodes, timers, music: null };
+    if (S.ambience === 'music') ambience.music = startMusic();
+  }
+
+  function stopAmbience() {
+    if (!ambience) return;
+    for (const n of ambience.nodes)
+      try {
+        n.stop();
+      } catch (e) {
+        /* ya detenido */
+      }
+    for (const id of ambience.timers) {
+      clearInterval(id);
+      clearTimeout(id);
+    }
+    if (ambience.music) clearInterval(ambience.music);
+    ambience = null;
+  }
+
+  /* ---------- Música lounge generativa (piano eléctrico, contrabajo y escobillas) ---------- */
+  const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const CHORDS = [
+    { root: 48, notes: [64, 67, 71, 74] }, // Cmaj9
+    { root: 45, notes: [60, 64, 67, 71] }, // Am9
+    { root: 50, notes: [65, 69, 72, 76] }, // Dm9
+    { root: 43, notes: [65, 69, 71, 76] }, // G13
+  ];
+
+  function ep(t, m, peak) {
+    const f = midi(m);
+    tone({ t, freq: f, d: 2.2, peak, dest: music, lp: 2200, a: 0.012 });
+    tone({ t, freq: f * 2, d: 0.6, peak: peak * 0.25, dest: music, a: 0.006 });
+  }
+
+  function startMusic() {
+    const beat = 60 / 82;
+    let step = 0; // corcheas
+    let next = now() + 0.1;
+    return setInterval(() => {
+      if (!ready()) {
+        next = now() + 0.1;
+        return;
+      }
+      while (next < now() + 0.25) {
+        const bar = Math.floor(step / 8);
+        const inBar = step % 8;
+        const chord = CHORDS[Math.floor(bar / 2) % CHORDS.length];
+        const nextChord = CHORDS[(Math.floor(bar / 2) + 1) % CHORDS.length];
+        const swing = inBar % 2 === 1 ? beat / 6 : 0;
+        const t = next + swing;
+        // piano: golpe en 1 y en el "y" del 2
+        if (inBar === 0 || inBar === 3) for (const n of chord.notes) ep(t, n, inBar === 0 ? 0.045 : 0.032);
+        // contrabajo caminando en negras
+        if (inBar % 2 === 0) {
+          const q = inBar / 2;
+          const last = bar % 2 === 1 && q === 3;
+          const m = last ? nextChord.root - 1 : chord.root + [0, 7, 12, 7][q] - (q === 2 ? 12 : 0);
+          tone({ t, freq: midi(m), type: 'triangle', lp: 520, d: 0.42, peak: 0.16, dest: music });
+        }
+        // platillo con escobillas
+        if (inBar % 2 === 0 || inBar === 3 || inBar === 7) burst({ t, dur: 0.14, freq: 8500, type: 'highpass', q: 0.5, peak: 0.018, dest: music });
+        if (inBar === 2 || inBar === 6) burst({ t, dur: 0.05, freq: 7000, q: 1.5, peak: 0.02, dest: music });
+        step++;
+        next += beat / 2;
+      }
+    }, 60);
+  }
+
+  /* ---------- Voz del crupier ---------- */
+  let voice = null;
+  function pickVoice() {
+    if (voice || !root.speechSynthesis) return voice;
+    const vs = root.speechSynthesis.getVoices();
+    voice =
+      vs.find((v) => /^es[-_](MX|US|419)/i.test(v.lang)) || vs.find((v) => /^es[-_]ES/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+    return voice;
+  }
+  function say(text) {
+    if (!S.voice || !S.enabled || !unlocked || !root.speechSynthesis || document.visibilityState !== 'visible') return;
+    const u = new root.SpeechSynthesisUtterance(text);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : 'es-MX';
+    u.rate = 1.03;
+    u.pitch = 0.92;
+    u.volume = Math.min(1, S.volume + 0.25);
+    root.speechSynthesis.cancel();
+    root.speechSynthesis.speak(u);
+  }
+
+  /* ---------- API ---------- */
+  function applyMaster() {
+    if (!ctx) return;
+    master.gain.setTargetAtTime(S.enabled ? S.volume : 0, now(), 0.05);
+  }
+
+  const api = {
+    supported: !!AC,
+    // Primer toque de la persona: crea y activa el audio.
+    unlock() {
+      if (!init()) return;
+      unlocked = true;
+      const go = () => {
+        applyMaster();
+        if (S.enabled) startAmbience();
+      };
+      if (ctx.state === 'suspended') ctx.resume().then(go, () => {});
+      else go();
+      if (S.voice && root.speechSynthesis) {
+        // calienta la síntesis de voz dentro del gesto (iPhone lo exige)
+        const u = new root.SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        root.speechSynthesis.speak(u);
+      }
+    },
+    configure(opts) {
+      const prevAmb = S.ambience;
+      Object.assign(S, opts);
+      if (!ctx) return;
+      applyMaster();
+      if (!S.enabled || S.ambience === 'off' || S.ambience !== prevAmb) stopAmbience();
+      if (S.enabled && unlocked) startAmbience();
+      if (!S.voice && root.speechSynthesis) root.speechSynthesis.cancel();
+    },
+    pause() {
+      stopAmbience();
+      if (root.speechSynthesis) root.speechSynthesis.cancel();
+      if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
+    },
+    resume() {
+      if (!ctx || !unlocked) return;
+      ctx.resume().then(() => {
+        if (S.enabled) startAmbience();
+      }, () => {});
+    },
+    say,
+  };
+  for (const k of Object.keys(fxs))
+    api[k] = (...args) => {
+      if (ready()) fxs[k](...args);
+    };
+  if (root.speechSynthesis && root.speechSynthesis.addEventListener)
+    root.speechSynthesis.addEventListener('voiceschanged', () => {
+      voice = null;
+      pickVoice();
+    });
+  root.SFX = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
 <script>
 /*
  * Seis Mazos — motor de blackjack.
@@ -2701,6 +3340,8 @@ table.score tr.total td {
   const SPEEDS = { slow: 650, normal: 380, fast: 190, instant: 0 };
   const BOT_NAMES = ['Marta', 'Joel', 'Inés', 'Raúl'];
   const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
+  // Sonidos (audio.js). Si no está disponible, todas las llamadas se ignoran.
+  const SFX = window.SFX || new Proxy({}, { get: () => () => {} });
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -2758,7 +3399,12 @@ table.score tr.total td {
   const STORE = 'seis-mazos-v1';
   const DEFAULT_TRAINING = {
     useDeviations: true,
-    onMistake: 'retry',
+    onMistake: 'continue',
+    sound: true,
+    volume: 0.7,
+    ambience: 'music',
+    voice: false,
+    casino: true,
     quiz: 'every5',
     quizTC: true,
     showTags: false,
@@ -2773,6 +3419,7 @@ table.score tr.total td {
     showHud: false,
   };
   const START_BANK = 5000;
+  const SETTINGS_VERSION = 2;
   const emptyStats = () => ({
     hands: 0,
     decisions: 0,
@@ -2807,6 +3454,7 @@ table.score tr.total td {
       stats,
       drills,
       tab: state.tab,
+      settingsVersion: SETTINGS_VERSION,
       token: state.token,
     };
   }
@@ -2840,6 +3488,8 @@ table.score tr.total td {
       };
     }
     if (data.tab) state.tab = data.tab;
+    // v2: los errores se juegan por defecto (antes había que corregirlos para seguir).
+    if ((data.settingsVersion || 1) < 2) settings.training.onMistake = 'continue';
     if (typeof data.token === 'string') state.token = data.token;
   }
 
@@ -3173,6 +3823,10 @@ table.score tr.total td {
     const dt = $('dealer-total');
     const visible = m.dealer.filter((c) => !c.down);
     T.paintOver = !!m.over;
+    if (m.over && !T.overSeen) {
+      T.overSeen = true;
+      if (BJ.handValue(m.dealer.filter((c) => !c.down)).total > 21) SFX.say('El crupier se pasa.');
+    } else if (!m.over) T.overSeen = false;
     dt.hidden = !m.dealer.length || !(settings.training.showTotals || m.over);
     if (visible.length) dt.textContent = totalText(visible);
     syncChildren($('seats'), m.seats.map(seatNode));
@@ -3188,6 +3842,66 @@ table.score tr.total td {
     if (!t.pid) return `Juega ${t.name}.`;
     const sit = settings.training.showTotals ? `${t.hand} contra ${t.up}` : `el crupier muestra ${t.up}`;
     return t.pid === myId() ? `Tu turno: ${sit}.` : `Turno de ${t.name}: ${sit}.`;
+  }
+
+  /* ---------- Efectos de casino: fichas que vuelan, letrero de blackjack ---------- */
+  function flyChips(fromEl, toEl, count, value) {
+    if (reducedMotion || !fromEl || !toEl || !fromEl.animate) return;
+    const a = fromEl.getBoundingClientRect();
+    const b = toEl.getBoundingClientRect();
+    if (!a.width || !b.width) return;
+    for (let i = 0; i < count; i++) {
+      const c = h('div', { class: 'chip fly-chip', 'data-v': value });
+      const x0 = a.left + a.width / 2 - 15 + (Math.random() * 40 - 20);
+      const y0 = a.top + a.height / 2 - 15;
+      const x1 = b.left + b.width / 2 - 15 + (Math.random() * 10 - 5);
+      const y1 = b.top + b.height / 2 - 15 - i * 3;
+      c.style.left = x0 + 'px';
+      c.style.top = y0 + 'px';
+      document.body.appendChild(c);
+      const fly = c.animate(
+        [
+          { transform: 'translate(0, 0) scale(0.7)', opacity: 0 },
+          { opacity: 1, offset: 0.2 },
+          { transform: `translate(${x1 - x0}px, ${y1 - y0}px) scale(1)`, opacity: 1 },
+        ],
+        { duration: 520 + i * 60, delay: i * 55, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' },
+      );
+      fly.onfinish = () => {
+        const out = c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, delay: 450, fill: 'forwards' });
+        out.onfinish = () => c.remove();
+      };
+    }
+  }
+
+  function showBanner(text) {
+    const b = $('felt-banner');
+    b.textContent = text;
+    b.classList.remove('show');
+    void b.offsetWidth;
+    b.classList.add('show');
+  }
+
+  function resultFx(kind, n) {
+    const dealer = $('dealer-cards');
+    const spot = n.root.querySelector('.spot');
+    if (kind === 'bj') {
+      SFX.blackjack();
+      SFX.say('¡Blackjack!');
+      showBanner('BLACKJACK');
+      flyChips(dealer, spot, 8, 100);
+    } else if (kind === 'win' || kind === 'even') {
+      SFX.win();
+      flyChips(dealer, spot, 5, 25);
+    } else if (kind === 'lose' || kind === 'bust' || kind === 'surrender') {
+      SFX.lose();
+      flyChips(spot, dealer, kind === 'surrender' ? 1 : 3, 25);
+    } else SFX.push();
+    if (kind === 'bj' || kind === 'win' || kind === 'even') {
+      n.root.classList.remove('won');
+      void n.root.offsetWidth;
+      n.root.classList.add('won');
+    }
   }
 
   /* ---------- Render de cartas, manos y asientos ---------- */
@@ -3206,6 +3920,7 @@ table.score tr.total td {
       }
       el.classList.remove('down');
       flipIn(el);
+      SFX.flip();
     }
     el.setAttribute('aria-label', cv.down ? 'Carta boca abajo' : cardName(cv));
     return el;
@@ -3219,6 +3934,7 @@ table.score tr.total td {
       if (el._fresh) {
         el._fresh = false;
         animateFrom(el, shoe);
+        SFX.card();
       }
   }
 
@@ -3260,6 +3976,14 @@ table.score tr.total td {
     n.root.classList.toggle('active', !!hv.active);
     n.total.hidden = hv.cards.length === 0 || !(settings.training.showTotals || hv.result || T.paintOver);
     n.total.textContent = hv.natural ? 'BJ' : hv.cards.length ? totalText(hv.cards) : '';
+    if (hv.result && !n.celebrated) {
+      n.celebrated = true;
+      if (seat.pid && seat.pid === myId()) resultFx(hv.result.result, n);
+    }
+    if (hv.doubled && !n.doubledFx) {
+      n.doubledFx = true;
+      SFX.chip(2);
+    }
     if (hv.result) {
       const r = hv.result;
       n.res.hidden = false;
@@ -3306,6 +4030,11 @@ table.score tr.total td {
   function renderShoe(m) {
     const s = m && m.shoe;
     if (!s) return;
+    if (T.seenRemaining != null && s.remaining > T.seenRemaining + 4) {
+      SFX.shuffle();
+      SFX.say('Barajando. Hagan sus apuestas.');
+    }
+    T.seenRemaining = s.remaining;
     if (T.tickDecks !== s.decks) buildTrayTicks(s.decks);
     $('shoe-fill').style.height = (s.remaining / s.size) * 100 + '%';
     $('shoe-cut').style.bottom = ((s.size - s.cutIndex) / s.size) * 100 + '%';
@@ -3454,6 +4183,7 @@ table.score tr.total td {
             'aria-label': `Añadir ${v}`,
             onclick: () => {
               T.bet += v;
+              SFX.chip(1);
               renderControls();
             },
           },
@@ -3479,6 +4209,7 @@ table.score tr.total td {
             class: 'btn small ghost',
             type: 'button',
             onclick: () => {
+              if (T.bet) SFX.chip(3);
               T.bet = 0;
               renderControls();
             },
@@ -3517,6 +4248,10 @@ table.score tr.total td {
       );
     } else if (p.kind === 'insurance') {
       const bet = p.data.bet;
+      if (!p.said) {
+        p.said = true;
+        SFX.say(p.data.natural ? '¿Pago igual?' : '¿Seguro?');
+      }
       box.append(
         h('span', null, p.data.natural ? '¿Aceptas pago igual (1 a 1)?' : `¿Seguro por ${money(bet / 2)}?`),
         h('button', { class: 'btn', type: 'button', onclick: () => p.resolve('I') }, 'Sí', h('kbd', null, 'S')),
@@ -3529,9 +4264,9 @@ table.score tr.total td {
       );
     } else if (p.kind === 'quiz') {
       const rc = stepper('quiz-rc', 0, 1);
-      const tc = p.data.askTC ? stepper('quiz-tc', 0, 1) : null;
+      const tc = p.data.askTC ? stepper('quiz-tc', 0, 0.5, true) : null;
       const submit = () => {
-        const a = { rc: Math.round(Number(rc.input.value) || 0), tc: tc ? Number(tc.input.value) || 0 : null };
+        const a = { rc: Math.round(rc.value()), tc: tc ? tc.value() : null };
         p.resolve(a);
       };
       box.append(
@@ -3555,19 +4290,33 @@ table.score tr.total td {
     }
   }
 
-  function stepper(id, value, step) {
-    const input = h('input', { id, type: 'number', inputmode: 'numeric', step: 'any', value: String(value) });
-    const bump = (d) => {
-      input.value = String(Math.round(((Number(input.value) || 0) + d) * 10) / 10);
+  // Lee un número escrito a mano: acepta coma o punto decimal y el signo menos tipográfico.
+  function parseNum(text) {
+    const v = Number(String(text || '').trim().replace(',', '.').replace(/[−–]/g, '-'));
+    return isFinite(v) ? v : 0;
+  }
+  // Campo numérico con − / + y ± (el teclado decimal del iPhone no tiene signo menos).
+  function stepper(id, value, step, decimals) {
+    const input = h('input', {
+      id,
+      type: 'text',
+      inputmode: decimals ? 'decimal' : 'numeric',
+      autocomplete: 'off',
+      value: String(value),
+    });
+    const set = (v) => {
+      input.value = String(Math.round(v * 10) / 10);
     };
     const root = h(
       'div',
       { class: 'stepper' },
-      h('button', { type: 'button', 'aria-label': 'Restar', onclick: () => bump(-step) }, '−'),
+      h('button', { type: 'button', 'aria-label': 'Cambiar signo', class: 'sign', onclick: () => set(-parseNum(input.value)) }, '±'),
+      h('button', { type: 'button', 'aria-label': 'Restar', onclick: () => set(parseNum(input.value) - step) }, '−'),
       input,
-      h('button', { type: 'button', 'aria-label': 'Sumar', onclick: () => bump(step) }, '+'),
+      h('button', { type: 'button', 'aria-label': 'Sumar', onclick: () => set(parseNum(input.value) + step) }, '+'),
     );
-    return { root, input };
+    input.addEventListener('focus', () => input.select());
+    return { root, input, value: () => parseNum(input.value) };
   }
 
   /* ---------- Panel lateral ---------- */
@@ -3579,6 +4328,10 @@ table.score tr.total td {
       lines && lines.length ? h('ul', { class: 'why' }, lines.map((l) => h('li', { html: l }))) : null,
     );
     if (box.id === 'feedback' && !(quiet && verdict === 'ok')) flashFeedback(verdict, mark, title, lines);
+    else if (box.id !== 'feedback') {
+      if (verdict === 'ok') SFX.good();
+      else if (verdict === 'bad') SFX.bad();
+    }
   }
 
   // Corrección al instante, justo encima de los botones de la mesa (visible también en el teléfono).
@@ -3593,6 +4346,8 @@ table.score tr.total td {
     );
     el.className = 'flash-fb ' + verdict;
     el.hidden = false;
+    if (verdict === 'ok') SFX.good();
+    else if (verdict === 'bad') SFX.bad();
     el.classList.remove('pop');
     void el.offsetWidth;
     el.classList.add('pop');
@@ -4696,6 +5451,8 @@ table.score tr.total td {
     SD.answered = false;
     $('sd-up').replaceChildren(makeCardEl(sc.upCard));
     const handEls = sc.cards.map((c) => makeCardEl(c));
+    SFX.card();
+    setTimeout(() => SFX.card(), 110);
     $('sd-hand').replaceChildren(...handEls);
     handEls.forEach((el) => animateFrom(el, null));
     $('sd-total').textContent = totalText(sc.cards);
@@ -4848,7 +5605,7 @@ table.score tr.total td {
             class: 'quiz',
             onsubmit: (e) => {
               e.preventDefault();
-              dvAnswer(Math.round(Number(st.input.value) || 0));
+              dvAnswer(Math.round(st.value()));
             },
           },
           h('label', { class: 'field' }, 'Índice', st.root),
@@ -5028,6 +5785,7 @@ table.score tr.total td {
     const els = group.map((c) => makeCardEl(c));
     $('cd-flash').replaceChildren(...els);
     if (CD.speed >= 0.35) els.forEach((el) => animateFrom(el, null));
+    SFX.card();
     $('cd-progress').style.width = (CD.i / CD.seq.length) * 100 + '%';
     CD.timer = setTimeout(cdTick, CD.speed * 1000);
   }
@@ -5052,7 +5810,7 @@ table.score tr.total td {
             class: 'quiz',
             onsubmit: (e) => {
               e.preventDefault();
-              cdCheck(Math.round(Number(st.input.value) || 0));
+              cdCheck(Math.round(st.value()));
             },
           },
           h('label', { class: 'field' }, 'Running count', st.root),
@@ -5127,7 +5885,7 @@ table.score tr.total td {
       ),
     );
     $('cd-prompt').textContent = `Zapato de ${decks} mazos. Mira la bandeja, estima los mazos que quedan y calcula el true count.`;
-    const st = stepper('cd-tc', 0, 0.5);
+    const st = stepper('cd-tc', 0, 0.5, true);
     $('cd-actions').replaceChildren(
       h(
         'form',
@@ -5135,7 +5893,7 @@ table.score tr.total td {
           class: 'quiz',
           onsubmit: (e) => {
             e.preventDefault();
-            cdTcCheck(Number(st.input.value) || 0);
+            cdTcCheck(st.value());
           },
         },
         h('label', { class: 'field' }, 'True count', st.root),
@@ -5373,7 +6131,7 @@ table.score tr.total td {
       hint: 'Con desviaciones, la jugada correcta depende del true count.',
       options: [[true, 'Básica + desviaciones'], [false, 'Solo básica']],
     },
-    { key: 'onMistake', label: 'Si te equivocas', options: [['retry', 'Corriges antes de seguir'], ['continue', 'Se juega igual']] },
+    { key: 'onMistake', label: 'Si te equivocas', hint: 'Siempre te avisa; aquí eliges si la jugada equivocada se juega.', options: [['continue', 'Se juega igual'], ['retry', 'Corriges antes de seguir']] },
     {
       key: 'quiz',
       label: 'Preguntar el conteo',
@@ -5584,6 +6342,51 @@ table.score tr.total td {
     }
   }
 
+  /* ---------- Sonido y ambiente ---------- */
+  function applyAudio() {
+    const t = settings.training;
+    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice });
+    document.documentElement.classList.toggle('casino', !!t.casino);
+    const btn = $('sound-btn');
+    btn.classList.toggle('muted', !t.sound);
+    btn.setAttribute('aria-label', t.sound ? 'Silenciar el sonido' : 'Activar el sonido');
+    btn.hidden = !SFX.supported;
+  }
+
+  const SOUND_FIELDS = [
+    { key: 'sound', label: 'Sonido', options: [[true, 'Activado'], [false, 'Silencio']] },
+    {
+      key: 'ambience',
+      label: 'Ambiente de sala',
+      hint: 'Murmullo, fichas y tragamonedas a lo lejos; con música lounge si quieres.',
+      options: [['off', 'Apagado'], ['room', 'Murmullo'], ['music', 'Murmullo y música']],
+    },
+    { key: 'voice', label: 'Voz del crupier', hint: '«¡Blackjack!», «El crupier se pasa», «Barajando»…', options: [[false, 'No'], [true, 'Sí']] },
+    { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
+  ];
+
+  function buildSoundForm() {
+    buildForm('sound-form', SOUND_FIELDS, settings.training, () => {
+      applyAudio();
+      save();
+    });
+    const vol = h('input', { id: 'f-volume', type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(settings.training.volume * 100)) });
+    const out = h('span', { class: 'num small' }, `${Math.round(settings.training.volume * 100)}%`);
+    vol.addEventListener('input', () => {
+      settings.training.volume = Number(vol.value) / 100;
+      out.textContent = `${vol.value}%`;
+      applyAudio();
+    });
+    vol.addEventListener('change', () => {
+      SFX.chip(2);
+      save();
+    });
+    $('sound-form').insertBefore(
+      h('div', { class: 'setting' }, h('div', null, h('span', null, 'Volumen')), h('label', { class: 'range' }, vol, out)),
+      $('sound-form').children[1],
+    );
+  }
+
   const isStandalone = () =>
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 
@@ -5779,6 +6582,29 @@ table.score tr.total td {
         onTrainChange('showTotals');
       });
       onTrainChange('showTotals');
+    });
+
+    // Sonido: se activa con el primer toque (regla de los navegadores).
+    buildSoundForm();
+    applyAudio();
+    const unlock = () => {
+      SFX.unlock();
+      applyAudio();
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+    $('sound-btn').addEventListener('click', () => {
+      settings.training.sound = !settings.training.sound;
+      applyAudio();
+      buildSoundForm();
+      if (settings.training.sound) SFX.chip(2);
+      save();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') SFX.pause();
+      else SFX.resume();
     });
 
     // En línea e instalación
