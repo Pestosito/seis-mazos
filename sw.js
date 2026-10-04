@@ -1,5 +1,5 @@
 /* Seis Mazos — service worker: guarda la app para usarla sin conexión. */
-const CACHE = 'seis-mazos-e8d60379';
+const CACHE = 'seis-mazos-615e3be7';
 const FONTS = 'seis-mazos-fonts';
 const ASSETS = [
   './',
@@ -10,6 +10,16 @@ const ASSETS = [
   'icons/icon-512.png',
   'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
+  'fonts/archivo-latin-400-normal.woff2',
+  'fonts/archivo-latin-500-normal.woff2',
+  'fonts/archivo-latin-600-normal.woff2',
+  'fonts/archivo-latin-700-normal.woff2',
+  'fonts/cinzel-latin-600-normal.woff2',
+  'fonts/cinzel-latin-700-normal.woff2',
+  'fonts/fonts.css',
+  'fonts/jetbrains-mono-latin-400-normal.woff2',
+  'fonts/jetbrains-mono-latin-600-normal.woff2',
+  'fonts/jetbrains-mono-latin-700-normal.woff2'
 ];
 
 self.addEventListener('install', (e) => {
@@ -38,21 +48,23 @@ self.addEventListener('fetch', (e) => {
   if (url.origin === self.location.origin) {
     if (req.mode === 'navigate') {
       // Primero la red (revalidando siempre: GitHub Pages pide guardar 10 minutos), para recibir
-      // actualizaciones; sin conexión, la copia guardada.
+      // actualizaciones. Sin conexión, o si la señal es tan mala que tarda más de 3 s, abre la
+      // copia guardada al instante; la versión nueva queda guardada para la próxima vez.
+      const net = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(async (res) => {
+        if (res.ok) await caches.open(CACHE).then((c) => c.put('index.html', res.clone()));
+        return res;
+      });
+      e.waitUntil(net.catch(() => {}));
       e.respondWith(
-        fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
-          .then((res) => {
-            if (res.ok) {
-              const copy = res.clone();
-              caches.open(CACHE).then((c) => c.put('index.html', copy));
-            }
-            return res;
-          })
-          .catch(() => caches.match('index.html')),
+        caches.match('index.html').then((saved) => {
+          if (!saved) return net;
+          const slow = new Promise((resolve) => setTimeout(() => resolve(saved), 3000));
+          return Promise.race([net.then((res) => (res.ok ? res : saved), () => saved), slow]);
+        }),
       );
       return;
     }
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
+    e.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req)));
     return;
   }
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
