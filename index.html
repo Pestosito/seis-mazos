@@ -335,6 +335,61 @@ select {
 .bank b.neg {
   color: var(--bad);
 }
+.bank-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.bank-btn:hover,
+.bank-btn:focus-visible {
+  border-color: var(--line);
+}
+.bank-btn svg {
+  width: 13px;
+  height: 13px;
+  align-self: center;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+.dialog {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 18px;
+  width: min(360px, calc(100vw - 32px));
+  box-shadow: var(--shadow);
+}
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.dialog h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+.dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dialog .stepper input {
+  flex: 1;
+  width: auto;
+  font-size: 1.1rem;
+}
+.controls.end {
+  justify-content: flex-end;
+}
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -998,9 +1053,15 @@ button.chip:active {
   gap: 2px;
   min-width: 0;
 }
+.flash-fb {
+  cursor: pointer;
+}
 .flash-why {
   color: var(--ink);
   font-size: 0.85rem;
+}
+.flash-why + .flash-why {
+  margin-top: 3px;
 }
 .flash-fb.pop {
   animation: pop 240ms ease-out;
@@ -1883,6 +1944,24 @@ table.score tr.total td {
     transition: none;
   }
 }
+.voice-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.voice-pick select {
+  min-width: 0;
+  max-width: 230px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+#bank-field .stepper .sign {
+  display: none;
+}
 
 </style>
 </head>
@@ -1905,8 +1984,21 @@ table.score tr.total td {
       <button class="icon-btn" type="button" id="sound-btn" aria-label="Silenciar el sonido" title="Sonido">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>
       </button>
-      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b></div>
+      <button class="btn small" type="button" id="install-btn" hidden>Instalar app</button><button class="bank-btn" type="button" id="bank-btn" title="Cambiar la banca"><span id="bank-label">Banca</span> <b id="bankroll">$5,000</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button></div>
   </header>
+
+  <dialog class="dialog" id="bank-dialog" aria-labelledby="bank-dlg-title">
+    <form method="dialog" id="bank-form">
+      <h2 id="bank-dlg-title">Cambiar la banca</h2>
+      <p class="small muted" id="bank-dlg-note"></p>
+      <div id="bank-field"></div>
+      <div class="controls start" id="bank-presets"></div>
+      <div class="controls end">
+        <button class="btn ghost" type="submit" value="cancel">Cancelar</button>
+        <button class="btn primary" type="submit" value="ok">Guardar</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="install-banner" id="update-banner" hidden>
     <div class="install-text"><b>Hay una versión nueva de Seis Mazos</b><span>Toca «Actualizar» cuando termines la mano.</span></div>
@@ -1968,7 +2060,7 @@ table.score tr.total td {
                 <div class="seg" id="bots-seg" role="radiogroup" aria-label="Jugadores robot en la mesa"></div>
                 <span class="small muted" id="bots-note"></span>
               </div>
-              <label class="check"><input type="checkbox" id="opt-totals"> Mostrar el total de cada mano</label>
+              <label class="check"><input type="checkbox" id="opt-totals" data-totals> Mostrar el total de cada mano</label>
             </div>
           </div>
         </div>
@@ -2018,6 +2110,7 @@ table.score tr.total td {
             <div class="seg" id="sd-filter" role="radiogroup" aria-label="Tipo de mano"></div>
             <label class="check"><input type="checkbox" id="sd-focus"> Repasar mis errores</label>
             <label class="check"><input type="checkbox" id="sd-auto" checked> Pasar sola si aciertas</label>
+            <label class="check"><input type="checkbox" id="sd-totals" data-totals> Mostrar el total de mi mano</label>
           </div>
           <div class="felt mini hide-tags">
             <div class="mini-row">
@@ -2079,6 +2172,7 @@ table.score tr.total td {
             <div class="seg" id="dv-mode" role="radiogroup" aria-label="Modo"></div>
             <div class="seg" id="dv-show" role="radiogroup" aria-label="Dato mostrado"></div>
             <div class="seg" id="dv-set" role="radiogroup" aria-label="Grupo"></div>
+            <label class="check"><input type="checkbox" id="dv-totals" data-totals> Mostrar el total de mi mano</label>
           </div>
           <div class="felt mini hide-tags">
             <div class="tc-badge num" id="dv-tc"></div>
@@ -2150,9 +2244,10 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">d9724d5f</span></p>
+            <p class="small muted">Versión <span class="num">e8d60379</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
+              <button class="btn small" type="button" id="btn-bank-edit">Cambiar banca</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
               <button class="btn small" type="button" id="btn-stats">Borrar estadísticas</button>
               <button class="btn small" type="button" id="btn-defaults">Reglas por defecto</button>
@@ -2173,7 +2268,7 @@ table.score tr.total td {
 (function (root) {
   'use strict';
   const AC = root.AudioContext || root.webkitAudioContext;
-  const S = { enabled: true, volume: 0.7, ambience: 'music', voice: false };
+  const S = { enabled: true, volume: 0.7, ambience: 'music', voice: false, voiceName: '' };
   let ctx = null;
   let master;
   let fx;
@@ -2411,29 +2506,6 @@ table.score tr.total td {
         chatGain.gain.setTargetAtTime(peak, t, 0.05);
       }, 170),
     );
-    // Sonidos lejanos del casino.
-    const distant = () => {
-      if (ready()) {
-        const r = Math.random();
-        const t = now();
-        if (r < 0.4) {
-          // tragamonedas pagando
-          const notes = [1046.5, 1318.5, 1568, 2093, 1568, 2093, 2637];
-          notes.forEach((f, i) => tone({ t: t + i * 0.075, freq: f, type: 'square', lp: 2600, d: 0.09, peak: 0.018, dest: amb }));
-        } else if (r < 0.75) {
-          for (let i = 0; i < 6; i++) {
-            const tt = t + i * rand(0.04, 0.09);
-            tone({ t: tt, freq: rand(2800, 3500), type: 'triangle', d: 0.05, peak: 0.03, dest: amb });
-            burst({ t: tt, dur: 0.02, freq: 5000, q: 2, peak: 0.02, dest: amb });
-          }
-        } else {
-          tone({ t, freq: 1568, d: 1.2, peak: 0.02, dest: amb });
-          tone({ t: t + 0.18, freq: 2093, d: 1.4, peak: 0.016, dest: amb });
-        }
-      }
-      timers.push(setTimeout(distant, rand(5000, 13000)));
-    };
-    timers.push(setTimeout(distant, rand(2000, 5000)));
     ambience = { nodes, timers, music: null };
     if (S.ambience === 'music') ambience.music = startMusic();
   }
@@ -2504,25 +2576,55 @@ table.score tr.total td {
   }
 
   /* ---------- Voz del crupier ---------- */
+  // Prefiere voces femeninas y naturales en español: las «mejoradas» o «premium» del iPhone,
+  // las «Natural» de Edge y la de Google en Android suenan mucho más humanas.
+  const FEMALE = /paulina|m[oó]nica|marisol|ang[eé]lica|soledad|isabela|francisca|sabina|helena|laura|dalia|elvira|paloma|carmen|luc[ií]a|esperanza|valeria|camila|ximena|renata|elena|beatriz|lupe|pen[eé]lope|conchita|google español|female|mujer/i;
+  const MALE = /juan|jorge|diego|carlos|pablo|ra[uú]l|enrique|miguel|alberto|[aá]lvaro|jos[eé]|antonio|\bmale\b|hombre/i;
+  const NOVELTY = /eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|bells|bubbles|albert|bad news|boing|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|bahh|junior|ralph|kathy|fred/i;
+  function voiceScore(v) {
+    const id = v.name + ' ' + (v.voiceURI || '');
+    let s = 0;
+    if (/^es[-_]MX/i.test(v.lang)) s += 4;
+    else if (/^es[-_](US|419)/i.test(v.lang)) s += 3;
+    else if (/^es[-_]ES/i.test(v.lang)) s += 2;
+    if (FEMALE.test(id)) s += 6;
+    if (MALE.test(id)) s -= 8;
+    if (/premium/i.test(id)) s += 7;
+    else if (/enhanced|mejorad|natural|neural|online/i.test(id)) s += 5;
+    if (NOVELTY.test(id)) s -= 20;
+    return s;
+  }
+  function spanishVoices() {
+    if (!root.speechSynthesis) return [];
+    return root.speechSynthesis
+      .getVoices()
+      .filter((v) => /^es/i.test(v.lang))
+      .sort((a, b) => voiceScore(b) - voiceScore(a));
+  }
+  const voiceId = (v) => v.voiceURI || v.name;
   let voice = null;
   function pickVoice() {
-    if (voice || !root.speechSynthesis) return voice;
-    const vs = root.speechSynthesis.getVoices();
-    voice =
-      vs.find((v) => /^es[-_](MX|US|419)/i.test(v.lang)) || vs.find((v) => /^es[-_]ES/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+    if (voice) return voice;
+    const vs = spanishVoices();
+    voice = (S.voiceName && vs.find((v) => voiceId(v) === S.voiceName)) || vs[0] || null;
     return voice;
   }
-  function say(text) {
-    if (!S.voice || !S.enabled || !unlocked || !root.speechSynthesis || document.visibilityState !== 'visible') return;
+  let lastSaid = 0;
+  // Pocas frases, despacio y bajito: nunca corta una frase a medias ni encadena una tras otra.
+  function say(text, force) {
+    const synth = root.speechSynthesis;
+    if (!synth || !S.enabled || (!force && (!S.voice || !unlocked || document.visibilityState !== 'visible'))) return;
+    if (!force && (synth.speaking || synth.pending || Date.now() - lastSaid < 6000)) return;
+    if (force) synth.cancel();
+    lastSaid = Date.now();
     const u = new root.SpeechSynthesisUtterance(text);
     const v = pickVoice();
     if (v) u.voice = v;
     u.lang = v ? v.lang : 'es-MX';
-    u.rate = 1.03;
-    u.pitch = 0.92;
-    u.volume = Math.min(1, S.volume + 0.25);
-    root.speechSynthesis.cancel();
-    root.speechSynthesis.speak(u);
+    u.rate = 0.9;
+    u.pitch = 1.04;
+    u.volume = Math.max(0.15, Math.min(1, S.volume * 0.8));
+    synth.speak(u);
   }
 
   /* ---------- API ---------- */
@@ -2579,6 +2681,7 @@ table.score tr.total td {
     },
     configure(opts) {
       const prevAmb = S.ambience;
+      if (opts.voiceName !== undefined && opts.voiceName !== S.voiceName) voice = null;
       Object.assign(S, opts);
       if (!ctx) return;
       audioSession();
@@ -2599,6 +2702,15 @@ table.score tr.total td {
       }, () => {});
     },
     say,
+    voices: () => spanishVoices().map((v) => ({ id: voiceId(v), name: v.name, lang: v.lang })),
+    get voiceName() {
+      const v = pickVoice();
+      return v ? v.name : '';
+    },
+    testVoice() {
+      say('Hola, bienvenido a la mesa. Hagan sus apuestas.', true);
+    },
+    onVoices: null,
   };
   for (const k of Object.keys(fxs))
     api[k] = (...args) => {
@@ -2608,6 +2720,7 @@ table.score tr.total td {
     root.speechSynthesis.addEventListener('voiceschanged', () => {
       voice = null;
       pickVoice();
+      if (api.onVoices) api.onVoices();
     });
   root.SFX = api;
 })(typeof window !== 'undefined' ? window : this);
@@ -3074,8 +3187,14 @@ table.score tr.total td {
   }
 
   // Rampa de apuestas clásica para Hi-Lo: (TC − 1) unidades, mínimo 1.
-  function rampUnits(tc, maxSpread) {
-    const u = Math.floor(tc) - 1;
+  /*
+   * Rampa de apuestas con el true count redondeado hacia abajo.
+   * 'bja' (la de Blackjack Apprenticeship): mínima hasta TC +1; desde +2, (TC − 1) × 2 unidades.
+   * 'soft': (TC − 1) unidades, mínimo 1 (la primera subida llega en TC +3).
+   */
+  function rampUnits(tc, maxSpread, style) {
+    const t = Math.floor(tc + 1e-9);
+    const u = style === 'soft' ? t - 1 : (t - 1) * 2;
     return Math.max(1, Math.min(maxSpread, u));
   }
 
@@ -3357,10 +3476,189 @@ table.score tr.total td {
 
 </script>
 <script>
+/*
+ * Seis Mazos — el porqué de cada jugada, en palabras.
+ * Usa BJ (engine.js). Funciona en el navegador (window.BJX) y en Node (require).
+ * Los porcentajes son de mazo infinito (6 mazos da casi lo mismo) y, con 10 o As,
+ * suponen que el crupier ya revisó y no tiene blackjack.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./engine.js'));
+  else root.BJX = factory(root.BJ);
+})(typeof self !== 'undefined' ? self : this, function (BJ) {
+  'use strict';
+
+  // Qué tan seguido se pasa el crupier según su carta visible.
+  const DEALER_BUST = {
+    s17: { 2: 35, 3: 37, 4: 39, 5: 42, 6: 42, 7: 26, 8: 24, 9: 23, 10: 23, 11: 17 },
+    h17: { 2: 36, 3: 38, 4: 40, 5: 42, 6: 44, 7: 26, 8: 24, 9: 23, 10: 23, 11: 20 },
+  };
+  function dealerBust(up, r) {
+    return DEALER_BUST[r && r.h17 ? 'h17' : 's17'][up];
+  }
+  // Probabilidad de pasarte si pides una carta con un total duro (12 → 31 %, 16 → 62 %).
+  function playerBust(total) {
+    if (total <= 11) return 0;
+    if (total >= 21) return 100;
+    return Math.round(((total - 8) / 13) * 100);
+  }
+  const up = (u) => (u === 11 ? 'el As' : `el ${u}`);
+  const Up = (u) => (u === 11 ? 'El As' : `El ${u}`);
+  const weak = (u) => u <= 6;
+
+  function hardWhy(t, u, code, r) {
+    const B = dealerBust(u, r);
+    if (code === 'Rh' || code === 'Rs' || code === 'R') {
+      const start =
+        t === 17
+          ? `Con H17 ${up(u)} llega a 18–21 muy seguido y tu 17 casi nunca gana.`
+          : `Si pides con ${t} te pasas ${playerBust(t)}%, y si te plantas ${up(u)} casi siempre te gana (solo se pasa ${B}%).`;
+      return `${start} En promedio esta mano pierde más de media apuesta; rendirte cuesta justo la mitad, así que pierdes menos.`;
+    }
+    if (t >= 18) return `${t} es buena mano y pedir te pasaría ${playerBust(t)}% de las veces: plántate.`;
+    if (t === 17) return `17 no es gran mano, pero si pides te pasas ${playerBust(17)}% de las veces: plántate.`;
+    if (t >= 12 && weak(u) && !(t === 12 && u <= 3))
+      return `${Up(u)} es carta débil: el crupier se pasa ${B}% de las veces. Si pides con ${t} te pasas ${playerBust(t)}%, así que plántate y deja que él se arriesgue.`;
+    if (t === 12 && u <= 3)
+      return `Con 12 solo te pasas si te llega un 10 (${playerBust(12)}%), y ${up(u)} no se pasa tanto (${B}%): pedir sale un poco mejor que plantarse.`;
+    if (t >= 12)
+      return `${Up(u)} es carta fuerte: el crupier termina entre 17 y 21 el ${100 - B}% de las veces, así que plantarte con ${t} casi siempre pierde. Pidiendo te pasas ${playerBust(t)}%, pero si no te pasas todavía puedes ganar.`;
+    if (t === 11) {
+      if (code === 'D')
+        return u === 11
+          ? `Con H17 el As se pasa un poco más (${B}%), y eso basta para que doblar 11 convenga: cualquier 10 te da 21.`
+          : `Con 11, cualquier 10 (casi 1 de cada 3 cartas) te da 21 y ninguna carta te pasa. Contra ${up(u)} vas con ventaja: dobla para apostar más cuando vas ganando.`;
+      return `Contra el As (solo se pasa ${B}%) la ventaja con 11 no alcanza para doblar con S17: pide.`;
+    }
+    if (t === 10)
+      return code === 'D'
+        ? `Con 10, un 10 o un As te deja en 20 o 21. Contra ${up(u)} vas con ventaja: dobla para apostar más.`
+        : `${Up(u)} del crupier ${u === 11 ? 'es más fuerte que' : 'empata con'} tu 10: no tienes ventaja para meter más dinero. Pide.`;
+    if (t === 9) {
+      if (code === 'D') return `Contra ${up(u)}, que se pasa ${B}%, tu 9 ya va con ventaja: dobla para aprovecharla.`;
+      return u === 2
+        ? `Contra el 2 la ventaja con 9 es mínima y no alcanza para doblar: pide.`
+        : `Contra ${up(u)}, 9 no tiene suficiente ventaja para doblar: pide.`;
+    }
+    return `Con ${t} ninguna carta te pasa y plantarte casi siempre pierde: siempre pide.`;
+  }
+
+  function softWhy(t, u, code, r) {
+    const B = dealerBust(u, r);
+    const safe = 'con una carta no te puedes pasar (el As vuelve a valer 1)';
+    if (t >= 20) return `Blando ${t} es mano fuerte: plántate.`;
+    if (t === 19)
+      return code === 'Ds'
+        ? `Con H17 el 6 se pasa ${B}%: doblar blando 19 gana más, y ${safe}.`
+        : 'Blando 19 es mano fuerte: plántate.';
+    if (t === 18) {
+      if (code === 'Ds') return `Contra ${up(u)}, que se pasa ${B}%, blando 18 rinde más doblando: ${safe}.`;
+      if (code === 'S')
+        return u === 2
+          ? `Contra el 2 con S17, blando 18 ya gana bastante y doblar no alcanza a convenir: plántate.`
+          : `Blando 18 le gana o empata a lo que suele sacar ${up(u)} (17 o 18): plántate.`;
+      return `Contra ${up(u)} el crupier suele llegar a 19 o 20 y tu 18 pierde seguido. Al pedir no te puedes pasar, así que pide para mejorar.`;
+    }
+    if (t === 12) return 'Blando 12: al pedir no te puedes pasar. Pide.';
+    if (code === 'D')
+      return `Blando ${t} es mano floja, pero ${safe}. Contra ${up(u)}, que se pasa ${B}%, doblar aprovecha su debilidad.`;
+    return `Blando ${t} es mano floja (plantado casi nunca gana) y al pedir no te puedes pasar: pide.`;
+  }
+
+  function pairWhy(v, u, code, r, action) {
+    const B = dealerBust(u, r);
+    if (code === 'Rp' && action === 'P') code = 'P'; // no se puede rendir: separar
+    const split = code === 'P' || (code === 'Ph' && r.das);
+    if (v === 11) return 'Juntos, dos Ases son solo 12. Separados, cada As llega a 21 con cualquier 10 (casi 1 de cada 3 cartas): siempre separa.';
+    if (v === 10)
+      return `20 gana casi siempre. Separar cambiaría una mano casi ganada por dos manos que empiezan en 10: plántate.`;
+    if (v === 8) {
+      if (code === 'Rp')
+        return 'Con H17, 8,8 contra el As pierde tanto que aun separando pierdes más de media apuesta: rendirte cuesta menos.';
+      return '16 es la peor mano del juego. Separando, cada 8 empieza una mano nueva desde 8, que es mucho mejor que tener 16.';
+    }
+    if (v === 9) {
+      if (split) {
+        if (weak(u)) return `Contra ${up(u)}, que se pasa ${B}%, conviene tener dos manos (y el doble de dinero) en la mesa.`;
+        if (u === 8) return 'Contra el 8 el crupier suele hacer 18 y tu 18 solo empata: dos manos desde 9 ganan más.';
+        return 'Contra el 9 el crupier suele hacer 19 y tu 18 pierde: dos manos desde 9 ganan más.';
+      }
+      if (u === 7) return 'El 7 suele terminar en 17 y tu 18 le gana: plántate.';
+      return `Contra ${up(u)} tu 18 a veces pierde, pero dos manos desde 9 serían peores: plántate.`;
+    }
+    if (v === 5) return 'Un par de 5 es un 10 duro: juégalo como 10 y no lo separes (dos manos desde 5 son malas).';
+    const das = code === 'Ph' ? ' (sobre todo porque con DAS puedes doblar después de separar)' : '';
+    if (split) {
+      if (v === 4) return `Contra ${up(u)} el crupier se pasa ${B}%, y con DAS puedes doblar cada mano después de separar: vale meter más dinero.`;
+      return `${v + v} es mala mano. Contra ${up(u)}${weak(u) ? `, que se pasa ${B}%,` : ''} dos manos que empiezan en ${v} ganan más${das}.`;
+    }
+    if (code === 'Ph') return `Sin DAS no puedes doblar después de separar, y así separar ${v},${v} contra ${up(u)} ya no conviene: juega el ${v + v}.`;
+    if (v === 4) return 'Un 8 es mejor que dos manos que empiezan en 4: pide.';
+    return `Contra ${up(u)}, separar pondría dos manos flojas contra una carta fuerte: mejor juega el ${v + v}.`;
+  }
+
+  /*
+   * Porqué de la estrategia básica.
+   * basic: lo que devuelve BJ.basicDecision. canSplit: si separar era posible.
+   */
+  function basicWhy(cards, u, r, basic, canSplit) {
+    if (canSplit && BJ.isPair(cards)) {
+      const v = cards[0].v === 1 ? 11 : cards[0].v;
+      return pairWhy(v, u, BJ.pairCode(v, u, r), r, basic && basic.action);
+    }
+    const hv = BJ.handValue(cards);
+    if (hv.soft) return softWhy(hv.total, u, BJ.softCode(hv.total, u, r), r);
+    // Con 3 cartas o más ya no se puede rendir ni doblar: se explica la jugada que queda.
+    let code = BJ.hardCode(hv.total, u, r);
+    if (basic && /^R/.test(code) && basic.action !== 'R') code = basic.action;
+    return hardWhy(hv.total, u, code, r);
+  }
+
+  // Porqué de una desviación: qué cambia cuando el true count pasa (o no) el índice.
+  function deviationWhy(dev, applies, cardsTotal) {
+    const t = dev.total || cardsTotal;
+    const u = dev.up;
+    const cond = applies ? `Con TC ${idxText(dev.index)} o más` : `Con TC menor a ${idxText(dev.index)}`;
+    switch (dev.kind) {
+      case 'ins':
+        return applies
+          ? `${cond}, más de 1 de cada 3 cartas que quedan es 10, y el seguro (que paga 2 a 1) ya gana dinero.`
+          : `El seguro paga 2 a 1, así que solo gana si más de 1 de cada 3 cartas que quedan es 10. Normalmente son 4 de cada 13 (31%): pierde dinero. Hace falta TC +3 o más.`;
+      case 'sur':
+        return applies
+          ? `${cond} quedan suficientes cartas altas: al pedir te pasas más y el crupier hace mano más seguido, así que rendirte pierde menos.`
+          : `${cond} quedan suficientes cartas bajas para que pedir con ${t} contra ${up(u)} pierda menos que regalar media apuesta.`;
+      case 'pair':
+        return applies
+          ? `${cond}, ${up(u)} se pasa tanto que conviene separar los 10 y tener el doble de dinero en la mesa.`
+          : `${cond}, tu 20 ya es mano casi ganada: no la rompas.`;
+      default:
+        if (dev.above === 'D')
+          return applies
+            ? `${cond} quedan suficientes cartas altas para que tu ${t} saque buena carta: ya vale doblar contra ${up(u)}.`
+            : `${cond} no hay suficientes cartas altas para que doblar ${t} contra ${up(u)} convenga: solo pide.`;
+        return applies
+          ? `${cond}, las cartas altas que quedan hacen que pedir con ${t} te pase demasiado (y ${up(u)} se pasa más): plántate.`
+          : `${cond} quedan suficientes cartas bajas para que pedir con ${t} contra ${up(u)} convenga.`;
+    }
+  }
+
+  function idxText(n) {
+    return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0';
+  }
+
+  const GROUP_NAME = { I18: 'Ilustres 18', Fab4: 'Fab 4' };
+
+  return { dealerBust, playerBust, basicWhy, deviationWhy, idxText, GROUP_NAME };
+});
+
+</script>
+<script>
 /* Seis Mazos — interfaz: mesa, ejercicios, tablas y reglas. Usa window.BJ (engine.js). */
 (function () {
   'use strict';
   const BJ = window.BJ;
+  const BJX = window.BJX;
   const rng = BJ.defaultRng();
   const NAME = Object.assign({}, BJ.ACTION_NAMES, { I: 'Tomar seguro', N: 'No tomar seguro' });
   const ACTIONS = ['H', 'S', 'D', 'P', 'R'];
@@ -3370,6 +3668,8 @@ table.score tr.total td {
   const CODE_LABEL = { H: 'H', S: 'S', D: 'D', Ds: 'Ds', P: 'P', R: 'R', Rh: 'R', Rs: 'Rs', Rp: 'Rp', '': '' };
   // Sonidos (audio.js). Si no está disponible, todas las llamadas se ignoran.
   const SFX = window.SFX || new Proxy({}, { get: () => () => {} });
+  // Sonidos de la mesa: solo suenan si la estás viendo (en línea la mesa sigue aunque cambies de pestaña).
+  const TFX = new Proxy({}, { get: (_, k) => (...a) => (state.tab === 'mesa' ? SFX[k](...a) : undefined) });
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- Utilidades ---------- */
@@ -3432,6 +3732,7 @@ table.score tr.total td {
     volume: 0.7,
     ambience: 'music',
     voice: false,
+    voiceName: '',
     casino: true,
     quiz: 'every5',
     quizTC: true,
@@ -3441,6 +3742,7 @@ table.score tr.total td {
     gradeBets: true,
     unit: 25,
     maxSpread: 12,
+    ramp: 'bja',
     bots: 2,
     seat: 'third',
     speed: 'normal',
@@ -3713,6 +4015,18 @@ table.score tr.total td {
   function tableSpread() {
     return NET.role === 'guest' && NET.view ? NET.view.maxSpread : settings.training.maxSpread;
   }
+  function tableRamp() {
+    return NET.role === 'guest' && NET.view ? NET.view.ramp : settings.training.ramp;
+  }
+  const rampUnits = (tc) => BJ.rampUnits(tc, tableSpread(), tableRamp());
+  // La rampa en una línea, con ejemplos en unidades.
+  function rampText() {
+    const max = tableSpread();
+    const ex = (tc) => `${signed(tc)} → ${rampUnits(tc)} u`;
+    return tableRamp() === 'soft'
+      ? `(TC − 1) unidades, mínimo 1: ${ex(2)}, ${ex(3)}, ${ex(4)}, ${ex(5)}… máximo ${max} u`
+      : `TC +1 o menos → 1 u (mínima); desde +2, (TC − 1) × 2: ${ex(2)}, ${ex(3)}, ${ex(4)}, ${ex(5)}… máximo ${max} u`;
+  }
 
   // Mensaje de estado; `per` permite un texto distinto para cada jugador.
   function setMsg(m, per) {
@@ -3827,6 +4141,7 @@ table.score tr.total td {
       rules: settings.rules,
       unit: settings.training.unit,
       maxSpread: settings.training.maxSpread,
+      ramp: settings.training.ramp,
       mode: NET.mode,
       team: team.bank,
       players: players.map((p) => ({ id: p.id, name: p.name, gone: !!p.gone, bank: bankOf(p), s: p.session })),
@@ -3851,10 +4166,6 @@ table.score tr.total td {
     const dt = $('dealer-total');
     const visible = m.dealer.filter((c) => !c.down);
     T.paintOver = !!m.over;
-    if (m.over && !T.overSeen) {
-      T.overSeen = true;
-      if (BJ.handValue(m.dealer.filter((c) => !c.down)).total > 21) SFX.say('El crupier se pasa.');
-    } else if (!m.over) T.overSeen = false;
     dt.hidden = !m.dealer.length || !(settings.training.showTotals || m.over);
     if (visible.length) dt.textContent = totalText(visible);
     syncChildren($('seats'), m.seats.map(seatNode));
@@ -3914,17 +4225,17 @@ table.score tr.total td {
     const dealer = $('dealer-cards');
     const spot = n.root.querySelector('.spot');
     if (kind === 'bj') {
-      SFX.blackjack();
-      SFX.say('¡Blackjack!');
+      TFX.blackjack();
+      TFX.say('Blackjack. Felicidades.');
       showBanner('BLACKJACK');
       flyChips(dealer, spot, 8, 100);
     } else if (kind === 'win' || kind === 'even') {
-      SFX.win();
+      TFX.win();
       flyChips(dealer, spot, 5, 25);
     } else if (kind === 'lose' || kind === 'bust' || kind === 'surrender') {
-      SFX.lose();
+      TFX.lose();
       flyChips(spot, dealer, kind === 'surrender' ? 1 : 3, 25);
-    } else SFX.push();
+    } else TFX.push();
     if (kind === 'bj' || kind === 'win' || kind === 'even') {
       n.root.classList.remove('won');
       void n.root.offsetWidth;
@@ -3948,7 +4259,7 @@ table.score tr.total td {
       }
       el.classList.remove('down');
       flipIn(el);
-      SFX.flip();
+      TFX.flip();
     }
     el.setAttribute('aria-label', cv.down ? 'Carta boca abajo' : cardName(cv));
     return el;
@@ -3962,7 +4273,7 @@ table.score tr.total td {
       if (el._fresh) {
         el._fresh = false;
         animateFrom(el, shoe);
-        SFX.card();
+        TFX.card();
       }
   }
 
@@ -4010,7 +4321,7 @@ table.score tr.total td {
     }
     if (hv.doubled && !n.doubledFx) {
       n.doubledFx = true;
-      SFX.chip(2);
+      TFX.chip(2);
     }
     if (hv.result) {
       const r = hv.result;
@@ -4059,8 +4370,8 @@ table.score tr.total td {
     const s = m && m.shoe;
     if (!s) return;
     if (T.seenRemaining != null && s.remaining > T.seenRemaining + 4) {
-      SFX.shuffle();
-      SFX.say('Barajando. Hagan sus apuestas.');
+      TFX.shuffle();
+      TFX.say('Barajamos. Hagan sus apuestas.');
     }
     T.seenRemaining = s.remaining;
     if (T.tickDecks !== s.decks) buildTrayTicks(s.decks);
@@ -4082,7 +4393,7 @@ table.score tr.total td {
     $('hud-tc').textContent = signed(tc, 1);
     $('hud-decks').textContent = (c.remaining / 52).toFixed(1);
     const edge = 0.5 * tc - BJ.houseEdge(activeRules());
-    const units = BJ.rampUnits(tc, tableSpread());
+    const units = rampUnits(tc);
     $('hud-extra').textContent = veiled
       ? 'Cuenta tú; ábrelo para comprobar.'
       : `Ventaja ≈ ${edge >= 0 ? '+' : '−'}${Math.abs(edge).toFixed(2)}% · rampa ${units} u (${money(units * tableUnit())})`;
@@ -4095,6 +4406,48 @@ table.score tr.total td {
     $('bank-label').textContent = coop ? 'Banca del equipo' : 'Banca';
     b.textContent = money(val);
     b.classList.toggle('neg', val < 0);
+  }
+
+  /* ---------- Cambiar la banca ---------- */
+  const coopBank = () => (NET.role === 'host' || NET.role === 'guest') && NET.mode === 'coop';
+  function currentBank() {
+    if (coopBank()) return NET.role === 'guest' ? (NET.view && NET.view.team) || 0 : team.bank;
+    return state.bankroll;
+  }
+  function setBank(v) {
+    v = Math.max(0, Math.min(10000000, Math.round(v)));
+    const coop = coopBank();
+    if (!coop) state.bankroll = v;
+    if (NET.role === 'guest') NET.sendHost({ t: 'bank', bank: v });
+    else if (coop) team.bank = v;
+    renderBank(NET.role === 'guest' ? NET.view : null);
+    renderTable();
+    renderStats();
+    save();
+  }
+  function openBankDialog() {
+    const dlg = $('bank-dialog');
+    if (!dlg || typeof dlg.showModal !== 'function') {
+      const v = window.prompt('Banca nueva', String(currentBank()));
+      if (v != null) setBank(parseNum(v));
+      return;
+    }
+    const coop = coopBank();
+    const field = stepper('bank-input', currentBank(), 500, false);
+    $('bank-field').replaceChildren(field.root);
+    $('bank-dlg-note').textContent = coop
+      ? 'Es la banca del equipo: el cambio lo ven todos en la mesa.'
+      : 'Las estadísticas no se borran; solo cambia el dinero con el que juegas.';
+    $('bank-presets').replaceChildren(
+      ...[1000, 2500, 5000, 10000, 25000].map((v) =>
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => (field.input.value = String(v)) }, money(v)),
+      ),
+    );
+    dlg.returnValue = '';
+    dlg.onclose = () => {
+      if (dlg.returnValue === 'ok') setBank(field.value());
+    };
+    dlg.showModal();
   }
 
   function renderScore(m) {
@@ -4225,7 +4578,7 @@ table.score tr.total td {
         h('b', null, money(T.bet)),
         h('span', null, `${Number(units.toFixed(2))} u · unidad ${money(unit)}`),
       );
-      const ramp = BJ.rampUnits(tcExact(), tableSpread());
+      const ramp = rampUnits(tcExact());
       const online = NET.role !== 'solo';
       fill(
         box,
@@ -4250,7 +4603,7 @@ table.score tr.total td {
               {
                 class: 'btn small ghost',
                 type: 'button',
-                title: 'Apuesta según la rampa (TC − 1) unidades',
+                title: 'Apuesta según la rampa: ' + rampText(),
                 onclick: () => {
                   T.bet = ramp * unit;
                   renderControls();
@@ -4278,7 +4631,7 @@ table.score tr.total td {
       const bet = p.data.bet;
       if (!p.said) {
         p.said = true;
-        SFX.say(p.data.natural ? '¿Pago igual?' : '¿Seguro?');
+        TFX.say(p.data.natural ? '¿Pago igual?' : '¿Desea seguro?');
       }
       box.append(
         h('span', null, p.data.natural ? '¿Aceptas pago igual (1 a 1)?' : `¿Seguro por ${money(bet / 2)}?`),
@@ -4364,13 +4717,18 @@ table.score tr.total td {
 
   // Corrección al instante, justo encima de los botones de la mesa (visible también en el teléfono).
   let flashTimer = null;
+  // Si aciertas se ve solo el porqué; si fallas (o pides pista), la explicación completa.
+  // Un toque lo cierra.
   function flashFeedback(verdict, mark, title, lines) {
     const el = $('flash-fb');
     clearTimeout(flashTimer);
+    lines = lines || [];
+    const why = lines.find((l) => l.startsWith(WHY));
+    const shown = verdict === 'ok' ? (why ? [why] : lines.slice(-1)) : lines;
     fill(
       el,
       h('span', { class: 'mark' }, mark),
-      h('div', null, h('b', null, title), lines && lines.length ? h('span', { class: 'flash-why', html: lines[lines.length > 1 && verdict !== 'info' ? lines.length - 1 : 0] }) : null),
+      h('div', null, h('b', null, title), shown.map((l) => h('span', { class: 'flash-why', html: l }))),
     );
     el.className = 'flash-fb ' + verdict;
     el.hidden = false;
@@ -4379,7 +4737,8 @@ table.score tr.total td {
     el.classList.remove('pop');
     void el.offsetWidth;
     el.classList.add('pop');
-    flashTimer = setTimeout(() => (el.hidden = true), verdict === 'bad' ? 9000 : verdict === 'ok' ? 3500 : 6000);
+    const read = shown.join(' ').replace(/<[^>]+>/g, '').length;
+    flashTimer = setTimeout(() => (el.hidden = true), Math.max(verdict === 'ok' ? 4000 : 9000, read * 70));
   }
 
   function renderStats() {
@@ -4419,18 +4778,53 @@ table.score tr.total td {
     return '';
   }
 
-  function explainDecision(g, cards, upV, tc) {
+  const WHY = '<b>Por qué:</b> ';
+
+  // Resultado de una desviación con el true count actual.
+  function devThen(dev, applies) {
+    return applies ? dev.above : dev.kind === 'sur' ? null : dev.below;
+  }
+  function devRule(dev) {
+    const idx = BJX.idxText(dev.index);
+    if (dev.kind === 'sur') return `rendirse solo con TC ${idx} o más`;
+    if (dev.kind === 'pair') return `separar con TC ${idx} o más; si no, plantarse`;
+    return `${NAME[dev.above].toLowerCase()} con TC ${idx} o más; si no, ${NAME[dev.below].toLowerCase()}`;
+  }
+
+  /*
+   * Explicación completa de una jugada: lo que dice la tabla, el conteo, las desviaciones
+   * que entran en juego y el porqué en palabras.
+   * avail: acciones posibles; cnt: { rc, remaining } al momento de decidir (opcional).
+   */
+  function explainDecision(g, cards, upV, tc, avail, cnt) {
+    const r = activeRules();
     const b = g.basic;
     const lines = [
-      `Básica: <b>${handLabel(cards)}</b> contra <b>${BJ.upLabel(upV)}</b> → <b>${NAME[b.action]}</b>${codeNote(b.code, b.action)}`,
+      `<b>Tabla básica:</b> ${handLabel(cards)} contra ${BJ.upLabel(upV)} → <b>${NAME[b.action]}</b>${codeNote(b.code, b.action)}`,
     ];
-    for (const { dev, applies } of g.devs) {
-      const idx = signed(dev.index);
-      const then = applies ? NAME[dev.above] : dev.kind === 'sur' ? 'no rendirse' : NAME[dev.below];
+    let cause = null;
+    if (g.devs.length) {
+      const decks = cnt ? Math.max(cnt.remaining, 1) / 52 : null;
       lines.push(
-        `Desviación <b>${BJ.deviationName(dev)}</b> (índice ${idx}): TC ${signed(tc, 1)} ${applies ? '≥' : '<'} ${idx} → <b>${then}</b>`,
+        cnt
+          ? `<b>Tu conteo:</b> RC ${signed(cnt.rc)} ÷ ${decks.toFixed(1)} mazos = TC <b>${signed(tc, 1)}</b>`
+          : `<b>Tu conteo:</b> TC <b>${signed(tc, 1)}</b>`,
       );
     }
+    for (const { dev, applies } of g.devs) {
+      const then = devThen(dev, applies);
+      if (!cause && g.isDeviation && (then || 'no-R') !== b.action) cause = { dev, applies };
+      lines.push(
+        `<b>Desviación ${BJX.GROUP_NAME[dev.group]}</b> · ${BJ.deviationName(dev)}: ${devRule(dev)}. Con ${signed(tc, 1)} → <b>${then ? NAME[then] : 'no rendirse'}</b>`,
+      );
+    }
+    const total = BJ.handValue(cards).total;
+    lines.push(
+      WHY +
+        (cause
+          ? BJX.deviationWhy(cause.dev, cause.applies, total)
+          : BJX.basicWhy(cards, upV, r, b, !!(avail && avail.split))),
+    );
     if (g.borderline) {
       const other = [...g.accepted].find((a) => a !== g.action);
       lines.push(`Estás justo en el índice: estimando los mazos a medio mazo también vale <b>${NAME[other]}</b>.`);
@@ -4438,11 +4832,32 @@ table.score tr.total td {
     return lines;
   }
 
+  // Título del aviso: dice si fue la básica, una desviación o te faltó (o sobró) conteo.
+  function decisionTitle(a, ok, g, tc) {
+    const tcs = signed(tc, 1);
+    if (ok) {
+      if (a !== g.action) return `${NAME[a]}: correcto (estás justo en el índice)`;
+      if (g.isDeviation) return `${NAME[a]}: correcto. Es desviación por conteo (la básica dice ${NAME[g.basic.action]})`;
+      return `${NAME[a]}: correcto`;
+    }
+    if (g.isDeviation && a === g.basic.action) return `${NAME[a]} es la básica, pero con TC ${tcs} toca ${NAME[g.action]}`;
+    for (const { dev, applies } of g.devs) {
+      const other = applies ? (dev.kind === 'sur' ? null : dev.below) : dev.above;
+      if (other === a) {
+        const cond = applies ? `menor a ${BJX.idxText(dev.index)}` : `${BJX.idxText(dev.index)} o más`;
+        return `${NAME[a]} solo con TC ${cond}; con ${tcs} toca ${NAME[g.action]}`;
+      }
+    }
+    return `${NAME[a]} no es lo correcto: toca ${NAME[g.action]}`;
+  }
+
   /* ---------- Desarrollo de una mano (solo en el anfitrión) ---------- */
   async function userDecision(p, hand, avail) {
     const useDev = settings.training.useDeviations;
     const tcx = tcExact();
+    const cnt = liveCount();
     const g = BJ.gradeDecision(hand.cards, T.upV, avail, T.rules, tcx, tcEst(), useDev);
+    const why = () => explainDecision(g, hand.cards, T.upV, tcx, avail, cnt);
     let first = true;
     let hinted = false;
     for (;;) {
@@ -4450,7 +4865,7 @@ table.score tr.total td {
       if (a == null || !(a === 'hint' || avail[AVAIL_KEY[a]])) return g.basic.action; // jugador desconectado
       if (a === 'hint') {
         hinted = true;
-        feedback(p, 'info', `Pista: ${NAME[g.action]}`, explainDecision(g, hand.cards, T.upV, tcx));
+        feedback(p, 'info', `Pista: ${NAME[g.action]}`, why());
         continue;
       }
       const ok = g.accepted.has(a);
@@ -4471,10 +4886,7 @@ table.score tr.total td {
         recordStat(p, d, err);
       }
       first = false;
-      const title = ok
-        ? `${NAME[a]}: correcto${g.isDeviation ? ' (desviación)' : ''}`
-        : `${NAME[a]} no es lo correcto: ${NAME[g.action]}`;
-      feedback(p, ok ? 'ok' : 'bad', title, explainDecision(g, hand.cards, T.upV, tcx));
+      feedback(p, ok ? 'ok' : 'bad', decisionTitle(a, ok, g, tcx), why());
       if (!ok && settings.training.onMistake === 'retry') {
         setMsg('', { [p.id]: 'Corrige la jugada para seguir.' });
         continue;
@@ -4547,6 +4959,20 @@ table.score tr.total td {
     if (seat.pid) credit(playerById(seat.pid), res.net);
   }
 
+  function insuranceLines(useDev, tc, take, natural) {
+    const even = natural ? ' El pago igual es lo mismo que tomar seguro teniendo blackjack.' : '';
+    if (!useDev)
+      return [
+        '<b>Estrategia básica:</b> no tomar seguro (ni pago igual).',
+        WHY + 'El seguro paga 2 a 1, así que solo gana si más de 1 de cada 3 cartas que quedan es 10. En un zapato normal son 4 de cada 13 (31%): a la larga pierde dinero.' + even,
+      ];
+    const dev = BJ.deviationList(activeRules()).find((d) => d.kind === 'ins');
+    return [
+      `<b>Desviación Ilustres 18</b> · Seguro: tomarlo solo con TC +3 o más. Con ${signed(tc, 1)} → <b>${take ? 'tomarlo' : 'no tomarlo'}</b>`,
+      WHY + BJX.deviationWhy(dev, take) + even,
+    ];
+  }
+
   async function gradedInsurance(p, natural, bet) {
     const useDev = settings.training.useDeviations;
     const tcx = tcExact();
@@ -4561,13 +4987,9 @@ table.score tr.total td {
         recordStat(p, { ins: 1, insCorrect: ok ? 1 : 0 }, err);
       }
       first = false;
-      const lines = [
-        useDev
-          ? `El seguro solo conviene con TC ≥ +3 (Hi-Lo). TC actual ${signed(tcx, 1)} → <b>${g.action === 'I' ? 'tomarlo' : 'no tomarlo'}</b>.`
-          : 'Con estrategia básica el seguro (y el pago igual) nunca conviene.',
-      ];
+      const lines = insuranceLines(useDev, tcx, g.action === 'I', natural);
       if (g.borderline) lines.push('Estás justo en el índice: se acepta cualquiera de las dos.');
-      feedback(p, ok ? 'ok' : 'bad', ok ? `${NAME[a]}: correcto` : `Lo correcto: ${NAME[g.action]}`, lines);
+      feedback(p, ok ? 'ok' : 'bad', ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[g.action]}`, lines);
       if (!ok && settings.training.onMistake === 'retry') continue;
       return a;
     }
@@ -4578,18 +5000,33 @@ table.score tr.total td {
     if (!t.gradeBets) return;
     const units = bet / t.unit;
     const tcx = tcExact();
-    const targets = [BJ.rampUnits(tcx, t.maxSpread), BJ.rampUnits(tcEst(), t.maxSpread)];
-    const ok = targets.some((s) => (s === 1 ? units <= 1.5 : Math.abs(units - s) <= Math.max(0.5, s * 0.25)));
+    const targets = [rampUnits(tcx), rampUnits(tcEst())];
+    const fits = (s) => (s === 1 ? units <= 1.5 : Math.abs(units - s) <= Math.max(0.5, s * 0.25));
+    const ok = targets.some(fits);
     const s = targets[0];
-    const err = ok ? null : { what: `Apuesta ${money(bet)}`, tc: `TC ${signed(tcx, 1)}`, you: `${Number(units.toFixed(2))} u`, right: `${s} u` };
+    const you = Number(units.toFixed(2));
+    const err = ok ? null : { what: `Apuesta ${money(bet)}`, tc: `TC ${signed(tcx, 1)}`, you: `${you} u`, right: `${s} u` };
     recordStat(p, { bets: 1, betsOk: ok ? 1 : 0 }, err);
-    feedback(
-      p,
-      ok ? 'ok' : 'bad',
-      ok ? `Apuesta de ${money(bet)}: acorde a la rampa` : `Apuesta de ${money(bet)}: fuera de la rampa`,
-      [`Rampa (TC − 1) unidades: con TC ${signed(tcx, 1)} tocan <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${Number(units.toFixed(2))} u.`],
-      true,
-    );
+    const floor = Math.floor(tcx + 1e-9);
+    const edge = 0.5 * tcx - BJ.houseEdge(activeRules());
+    const edgeTxt = `${edge >= 0 ? '+' : '−'}${Math.abs(edge).toFixed(1)}%`;
+    const firstRaise = [1, 2, 3, 4, 5].find((x) => rampUnits(x) > 1);
+    const why =
+      s === 1
+        ? `con TC ${signed(tcx, 1)} tu ventaja es ≈ ${edgeTxt}${edge < 0.25 ? ': la casa todavía gana o van casi parejos' : ''}, así que va la mínima. Se sube desde TC ${signed(firstRaise)}, cuando ya tienes ventaja (≈ +${(0.5 * firstRaise - BJ.houseEdge(activeRules())).toFixed(1)}%).`
+        : `con TC ${signed(tcx, 1)} tienes ≈ ${edgeTxt} de ventaja: apostar más cuando vas ganando es lo que hace ganar al conteo. Cada punto de TC suma ≈ 0.5%.`;
+    const title = ok
+      ? `Apuesta de ${money(bet)}: acorde a la rampa`
+      : you > s
+        ? `Apuesta de ${money(bet)}: muy alta. Con TC ${signed(tcx, 1)} tocan ${money(s * t.unit)}${s === 1 ? ' (la mínima)' : ''}`
+        : `Apuesta de ${money(bet)}: muy baja. Con TC ${signed(tcx, 1)} tocan ${money(s * t.unit)}`;
+    const lines = [
+      `<b>Tu conteo:</b> TC ${signed(tcx, 1)}. Para apostar se redondea hacia abajo: <b>${signed(floor)}</b> → <b>${s} u</b> (${money(s * t.unit)}). Apostaste ${you} u.`,
+      `<b>Rampa:</b> ${rampText()}.`,
+      WHY + why,
+    ];
+    if (ok && !fits(s)) lines.push('Estás justo en el cambio de escalón: estimando los mazos a medio mazo también vale lo que apostaste.');
+    feedback(p, ok ? 'ok' : 'bad', title, lines, true);
   }
 
   async function countQuiz(p) {
@@ -5066,6 +5503,13 @@ table.score tr.total td {
       }
     } else if (msg.t === 'ping') {
       NET.send(p, { t: 'pong' });
+    } else if (msg.t === 'bank' && typeof msg.bank === 'number' && isFinite(msg.bank)) {
+      const v = Math.max(0, Math.min(10000000, Math.round(msg.bank)));
+      if (NET.mode === 'coop') team.bank = v;
+      else p.bank = v;
+      NET.status = `${p.name} cambió ${NET.mode === 'coop' ? 'la banca del equipo' : 'su banca'} a ${money(v)}.`;
+      renderOnline();
+      renderTable();
     } else if (msg.t === 'bye') {
       guestGone(p, `${p.name} salió de la mesa.`);
     } else if (msg.t === 'away' && !p.gone) {
@@ -5479,21 +5923,30 @@ table.score tr.total td {
     SD.answered = false;
     $('sd-up').replaceChildren(makeCardEl(sc.upCard));
     const handEls = sc.cards.map((c) => makeCardEl(c));
-    SFX.card();
-    setTimeout(() => SFX.card(), 110);
+    if (state.tab === 'estrategia') {
+      SFX.card();
+      setTimeout(() => SFX.card(), 110);
+    }
     $('sd-hand').replaceChildren(...handEls);
     handEls.forEach((el) => animateFrom(el, null));
     $('sd-total').textContent = totalText(sc.cards);
-    $('sd-total').hidden = !settings.training.showTotals;
-    $('sd-prompt').textContent = settings.training.showTotals
-      ? `${handLabel(sc.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`
-      : `El crupier muestra ${BJ.upLabel(SD.cur.upV)}. Suma tu mano y decide: ¿qué haces?`;
+    sdPrompt();
     $('sd-actions').replaceChildren(...actionButtons(avail, sdAnswer));
     showFeedback($('sd-fb'), 'info', 'Elige una jugada', [
       'Atajos: <b>H</b> pedir, <b>S</b> plantarse, <b>D</b> doblar, <b>P</b> separar, <b>R</b> rendirse. <b>Enter</b> pasa a la siguiente.',
     ]);
     $('sd-chart-title').textContent = 'Tabla';
     $('sd-chart').replaceChildren(h('p', { class: 'empty' }, 'La casilla de la tabla aparece al responder.'));
+  }
+
+  // Con el total oculto la pregunta no dice qué mano es: hay que sumarla.
+  function sdPrompt() {
+    if (!SD.cur || SD.answered) return;
+    const show = settings.training.showTotals;
+    $('sd-total').hidden = !show;
+    $('sd-prompt').textContent = show
+      ? `${handLabel(SD.cur.cards)} contra ${BJ.upLabel(SD.cur.upV)}. Primera decisión: ¿qué haces?`
+      : `El crupier muestra ${BJ.upLabel(SD.cur.upV)}. Suma tu mano y decide: ¿qué haces?`;
   }
 
   function sdAnswer(a) {
@@ -5522,6 +5975,7 @@ table.score tr.total td {
       ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[d.action]}`,
       [
         `<b>${handLabel(c.cards)}</b> contra <b>${BJ.upLabel(c.upV)}</b> → <b>${NAME[d.action]}</b>${codeNote(d.code, d.action)}`,
+        WHY + BJX.basicWhy(c.cards, c.upV, r, d, c.avail.split),
         ok && $('sd-auto').checked ? 'Siguiente en un momento…' : 'Pulsa <b>Enter</b> o el botón para la siguiente.',
       ],
     );
@@ -5682,10 +6136,10 @@ table.score tr.total td {
         right = g.action;
       }
       ok = a === right;
-      title = ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[right]}`;
+      title = g ? decisionTitle(a, ok, g, c.tc) : ok ? `${NAME[a]}: correcto` : `${NAME[a]} no: lo correcto es ${NAME[right]}`;
       lines = g
-        ? explainDecision(Object.assign(g, { borderline: false }), c.cards, c.upV, c.tc)
-        : [`Seguro con TC ≥ +3. TC ${signed(c.tc, 1)} → <b>${right === 'I' ? 'tomarlo' : 'no tomarlo'}</b>.`];
+        ? explainDecision(Object.assign(g, { borderline: false }), c.cards, c.upV, c.tc, c.avail)
+        : insuranceLines(true, c.tc, right === 'I', false);
       if (DV.show === 'rc') lines.unshift(`TC = ${$('dv-tc').textContent.replace(' · quedan ', ' ÷ ')} = <b>${signed(c.tc, 2)}</b>`);
     }
     DV.answered = true;
@@ -6117,7 +6571,7 @@ table.score tr.total td {
         'Cuánto apostar',
         [
           `Cada punto de true count vale aproximadamente un 0,5 % de ventaja. Con tus reglas la casa parte de ≈${edge.toFixed(2).replace('.', ',')} %, así que la ventaja pasa al jugador hacia TC ${signed(breakEven, 1).replace('.', ',')}.`,
-          `Rampa usada aquí: (TC − 1) unidades, con un mínimo de 1 y un máximo de ${settings.training.maxSpread}. Con unidad de ${money(unit)}: TC +3 → ${money(2 * unit)}, TC +5 → ${money(4 * unit)}.`,
+          `Rampa usada aquí: ${rampText()}. El true count se redondea hacia abajo para apostar (TC +2,7 cuenta como +2). Con unidad de ${money(unit)}: TC +2 → ${money(rampUnits(2) * unit)}, TC +3 → ${money(rampUnits(3) * unit)}, TC +5 → ${money(rampUnits(5) * unit)}.`,
         ],
       ],
       [
@@ -6179,7 +6633,13 @@ table.score tr.total td {
       hint: 'Si está oculto, estímalos con la bandeja de descartes.',
       options: [[false, 'No'], [true, 'Sí']],
     },
-    { key: 'gradeBets', label: 'Evaluar la apuesta', hint: 'Según la rampa (TC − 1) unidades.', options: [[true, 'Sí'], [false, 'No']] },
+    { key: 'gradeBets', label: 'Evaluar la apuesta', hint: 'Según la rampa que elijas abajo.', options: [[true, 'Sí'], [false, 'No']] },
+    {
+      key: 'ramp',
+      label: 'Rampa de apuestas',
+      hint: 'Normal: mínima hasta TC +1 y desde +2, (TC − 1) × 2 unidades (como Blackjack Apprenticeship). Suave: (TC − 1) unidades.',
+      options: [['bja', 'Normal (BJA)'], ['soft', 'Suave']],
+    },
     { key: 'unit', label: 'Unidad de apuesta', options: [[10, '$10'], [25, '$25'], [50, '$50'], [100, '$100']] },
     { key: 'maxSpread', label: 'Apuesta máxima', options: [[8, '8 u'], [12, '12 u'], [16, '16 u']] },
     { key: 'bots', label: 'Otros jugadores', hint: 'Juegan estrategia básica; sus cartas también se cuentan.', options: [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4']] },
@@ -6261,8 +6721,8 @@ table.score tr.total td {
     if (key === 'speed') applySpeed();
     if (key === 'showTotals') {
       const show = settings.training.showTotals;
-      $('opt-totals').checked = show;
-      if (!SD.answered) $('sd-total').hidden = !show;
+      for (const el of document.querySelectorAll('[data-totals]')) el.checked = show;
+      sdPrompt();
       if (!DV.answered) $('dv-total').hidden = !show;
     }
     if (key === 'bots') setTimeout(renderBotsPicker, 0);
@@ -6273,7 +6733,7 @@ table.score tr.total td {
     renderPrint();
     renderTable();
     renderControls();
-    if (key === 'unit' || key === 'maxSpread') renderGuide();
+    if (key === 'unit' || key === 'maxSpread' || key === 'ramp') renderGuide();
     save();
   }
 
@@ -6373,7 +6833,7 @@ table.score tr.total td {
   /* ---------- Sonido y ambiente ---------- */
   function applyAudio() {
     const t = settings.training;
-    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice });
+    SFX.configure({ enabled: t.sound, volume: t.volume, ambience: t.ambience, voice: t.voice, voiceName: t.voiceName });
     document.documentElement.classList.toggle('casino', !!t.casino);
     const btn = $('sound-btn');
     btn.classList.toggle('muted', !t.sound);
@@ -6386,10 +6846,10 @@ table.score tr.total td {
     {
       key: 'ambience',
       label: 'Ambiente de sala',
-      hint: 'Murmullo, fichas y tragamonedas a lo lejos; con música lounge si quieres.',
+      hint: 'Murmullo suave de la sala; con música lounge si quieres.',
       options: [['off', 'Apagado'], ['room', 'Murmullo'], ['music', 'Murmullo y música']],
     },
-    { key: 'voice', label: 'Voz del crupier', hint: '«¡Blackjack!», «El crupier se pasa», «Barajando»…', options: [[false, 'No'], [true, 'Sí']] },
+    { key: 'voice', label: 'Voz del crupier', hint: 'Pocas frases, despacio: «Blackjack», «¿Desea seguro?» y «Barajamos».', options: [[false, 'No'], [true, 'Sí']] },
     { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
   ];
 
@@ -6447,7 +6907,46 @@ table.score tr.total td {
       'Probar sonido',
     );
     $('sound-form').append(h('div', { class: 'setting' }, h('div', null, h('span', null, 'Prueba'), h('span', { class: 'hint', id: 'audio-state' }, '')), test));
+    $('sound-form').append(h('div', { class: 'setting', id: 'voice-row' }));
+    renderVoicePicker();
+    SFX.onVoices = renderVoicePicker;
     renderAudioState();
+  }
+
+  // Lista de voces en español del teléfono; la mejor (femenina y natural) va primero.
+  function renderVoicePicker() {
+    const row = $('voice-row');
+    if (!row || !SFX.voices) return;
+    const list = SFX.voices();
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const sel = h(
+      'select',
+      { id: 'f-voiceName', 'aria-label': 'Voz del crupier' },
+      h('option', { value: '' }, list.length ? `La más natural (${list[0].name})` : 'La del teléfono'),
+      list.map((v) => h('option', { value: v.id, selected: v.id === settings.training.voiceName }, `${v.name} · ${v.lang}`)),
+    );
+    sel.addEventListener('change', () => {
+      settings.training.voiceName = sel.value;
+      applyAudio();
+      save();
+      SFX.testVoice();
+    });
+    const test = h('button', { class: 'btn small', type: 'button', onclick: () => SFX.testVoice() }, 'Probar voz');
+    row.replaceChildren(
+      h(
+        'div',
+        null,
+        h('span', null, 'Voz'),
+        h(
+          'span',
+          { class: 'hint' },
+          ios
+            ? 'Para una voz más humana: Ajustes → Accesibilidad → Contenido leído → Voces → Español, y descarga «Paulina» o «Mónica» en versión Mejorada o Premium. Luego cierra y abre la app.'
+            : 'Si tu teléfono tiene voces «mejoradas», «premium» o «natural», aparecen aquí.',
+        ),
+      ),
+      h('div', { class: 'voice-pick' }, sel, test),
+    );
   }
 
   const isStandalone = () =>
@@ -6614,6 +7113,8 @@ table.score tr.total td {
       else setMsg('Se barajará un zapato nuevo antes de la próxima mano.');
       showTab('mesa');
     });
+    $('bank-btn').addEventListener('click', openBankDialog);
+    $('btn-bank-edit').addEventListener('click', openBankDialog);
     twoStep($('btn-bank'), 'Reiniciar banca', () => {
       state.bankroll = START_BANK;
       if (NET.role === 'host' && NET.mode === 'indiv') renderTable();
@@ -6637,7 +7138,13 @@ table.score tr.total td {
       onRuleChange('decks');
     });
 
-    $('opt-totals').addEventListener('change', (e) => {
+    $('flash-fb').addEventListener('click', () => {
+      clearTimeout(flashTimer);
+      $('flash-fb').hidden = true;
+    });
+
+    // El mismo ajuste desde la mesa, los ejercicios o Reglas.
+    for (const el of document.querySelectorAll('[data-totals]')) el.addEventListener('change', (e) => {
       settings.training.showTotals = e.target.checked;
       const f = TRAIN_FIELDS.find((x) => x.key === 'showTotals');
       seg('f-showTotals', 'f-showTotals', f.options, settings.training.showTotals, (v) => {
@@ -6646,6 +7153,7 @@ table.score tr.total td {
       });
       onTrainChange('showTotals');
     });
+    for (const el of document.querySelectorAll('[data-totals]')) el.checked = settings.training.showTotals;
 
     // Sonido: se activa con el primer toque (regla de los navegadores).
     buildSoundForm();
