@@ -363,20 +363,47 @@
     master.gain.setTargetAtTime(S.enabled ? S.volume : 0, now(), 0.05);
   }
 
+  // iPhone: con 'playback' el juego suena como una app multimedia (también con el interruptor de silencio).
+  function audioSession() {
+    try {
+      if (root.navigator && root.navigator.audioSession) root.navigator.audioSession.type = S.enabled ? 'playback' : 'auto';
+    } catch (e) {
+      /* no disponible */
+    }
+  }
+
+  let voiceWarm = false;
   const api = {
     supported: !!AC,
-    // Primer toque de la persona: crea y activa el audio.
+    get state() {
+      return !ctx ? 'sin iniciar' : ctx.state;
+    },
+    // Se llama en cada toque mientras el audio no esté funcionando: el iPhone solo deja
+    // arrancarlo dentro de un gesto (al levantar el dedo) y lo vuelve a pausar en segundo plano.
     unlock() {
       if (!init()) return;
       unlocked = true;
+      audioSession();
       const go = () => {
         applyMaster();
         if (S.enabled) startAmbience();
       };
-      if (ctx.state === 'suspended') ctx.resume().then(go, () => {});
-      else go();
-      if (S.voice && root.speechSynthesis) {
-        // calienta la síntesis de voz dentro del gesto (iPhone lo exige)
+      if (ctx.state !== 'running') {
+        // Un búfer mudo reproducido dentro del gesto desbloquea el audio en Safari.
+        try {
+          const b = ctx.createBuffer(1, 1, 22050);
+          const src = ctx.createBufferSource();
+          src.buffer = b;
+          src.connect(ctx.destination);
+          src.start(0);
+        } catch (e) {
+          /* sin efecto */
+        }
+        const p = ctx.resume();
+        if (p && p.then) p.then(go, () => {});
+      } else go();
+      if (S.voice && !voiceWarm && root.speechSynthesis) {
+        voiceWarm = true;
         const u = new root.SpeechSynthesisUtterance(' ');
         u.volume = 0;
         root.speechSynthesis.speak(u);
@@ -386,6 +413,7 @@
       const prevAmb = S.ambience;
       Object.assign(S, opts);
       if (!ctx) return;
+      audioSession();
       applyMaster();
       if (!S.enabled || S.ambience === 'off' || S.ambience !== prevAmb) stopAmbience();
       if (S.enabled && unlocked) startAmbience();

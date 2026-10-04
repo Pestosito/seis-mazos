@@ -3034,6 +3034,19 @@
     { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
   ];
 
+  function renderAudioState() {
+    const el = $('audio-state');
+    if (!el) return;
+    const st = SFX.state;
+    el.textContent = !SFX.supported
+      ? 'Este navegador no permite sonido.'
+      : st === 'running'
+        ? settings.training.sound
+          ? 'Audio funcionando.'
+          : 'Audio listo, pero el sonido está en silencio.'
+        : 'Audio en pausa: toca «Probar sonido» para activarlo.';
+  }
+
   function buildSoundForm() {
     buildForm('sound-form', SOUND_FIELDS, settings.training, () => {
       applyAudio();
@@ -3054,6 +3067,28 @@
       h('div', { class: 'setting' }, h('div', null, h('span', null, 'Volumen')), h('label', { class: 'range' }, vol, out)),
       $('sound-form').children[1],
     );
+    const test = h(
+      'button',
+      {
+        class: 'btn small',
+        type: 'button',
+        onclick: () => {
+          if (!settings.training.sound) {
+            settings.training.sound = true;
+            applyAudio();
+          }
+          SFX.unlock();
+          setTimeout(() => {
+            SFX.chip(3);
+            setTimeout(() => SFX.win(), 250);
+            renderAudioState();
+          }, 120);
+        },
+      },
+      'Probar sonido',
+    );
+    $('sound-form').append(h('div', { class: 'setting' }, h('div', null, h('span', null, 'Prueba'), h('span', { class: 'hint', id: 'audio-state' }, '')), test));
+    renderAudioState();
   }
 
   const isStandalone = () =>
@@ -3256,14 +3291,13 @@
     // Sonido: se activa con el primer toque (regla de los navegadores).
     buildSoundForm();
     applyAudio();
+    // Se intenta en cada toque mientras el audio no funcione (el iPhone lo pausa al salir de la app).
     const unlock = () => {
+      if (SFX.state === 'running') return;
       SFX.unlock();
-      applyAudio();
-      document.removeEventListener('pointerdown', unlock, true);
-      document.removeEventListener('keydown', unlock, true);
+      setTimeout(renderAudioState, 150);
     };
-    document.addEventListener('pointerdown', unlock, true);
-    document.addEventListener('keydown', unlock, true);
+    for (const ev of ['touchend', 'click', 'pointerup', 'keydown']) document.addEventListener(ev, unlock, true);
     $('sound-btn').addEventListener('click', () => {
       settings.training.sound = !settings.training.sound;
       applyAudio();

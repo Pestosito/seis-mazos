@@ -2150,7 +2150,7 @@ table.score tr.total td {
           </div>
           <div class="panel">
             <h2>Mantenimiento</h2>
-            <p class="small muted">Versión <span class="num">6b15d4d9</span></p>
+            <p class="small muted">Versión <span class="num">d9724d5f</span></p>
             <div class="controls start">
               <button class="btn small" type="button" id="btn-shuffle">Barajar zapato ahora</button>
               <button class="btn small" type="button" id="btn-bank">Reiniciar banca</button>
@@ -2531,20 +2531,47 @@ table.score tr.total td {
     master.gain.setTargetAtTime(S.enabled ? S.volume : 0, now(), 0.05);
   }
 
+  // iPhone: con 'playback' el juego suena como una app multimedia (también con el interruptor de silencio).
+  function audioSession() {
+    try {
+      if (root.navigator && root.navigator.audioSession) root.navigator.audioSession.type = S.enabled ? 'playback' : 'auto';
+    } catch (e) {
+      /* no disponible */
+    }
+  }
+
+  let voiceWarm = false;
   const api = {
     supported: !!AC,
-    // Primer toque de la persona: crea y activa el audio.
+    get state() {
+      return !ctx ? 'sin iniciar' : ctx.state;
+    },
+    // Se llama en cada toque mientras el audio no esté funcionando: el iPhone solo deja
+    // arrancarlo dentro de un gesto (al levantar el dedo) y lo vuelve a pausar en segundo plano.
     unlock() {
       if (!init()) return;
       unlocked = true;
+      audioSession();
       const go = () => {
         applyMaster();
         if (S.enabled) startAmbience();
       };
-      if (ctx.state === 'suspended') ctx.resume().then(go, () => {});
-      else go();
-      if (S.voice && root.speechSynthesis) {
-        // calienta la síntesis de voz dentro del gesto (iPhone lo exige)
+      if (ctx.state !== 'running') {
+        // Un búfer mudo reproducido dentro del gesto desbloquea el audio en Safari.
+        try {
+          const b = ctx.createBuffer(1, 1, 22050);
+          const src = ctx.createBufferSource();
+          src.buffer = b;
+          src.connect(ctx.destination);
+          src.start(0);
+        } catch (e) {
+          /* sin efecto */
+        }
+        const p = ctx.resume();
+        if (p && p.then) p.then(go, () => {});
+      } else go();
+      if (S.voice && !voiceWarm && root.speechSynthesis) {
+        voiceWarm = true;
         const u = new root.SpeechSynthesisUtterance(' ');
         u.volume = 0;
         root.speechSynthesis.speak(u);
@@ -2554,6 +2581,7 @@ table.score tr.total td {
       const prevAmb = S.ambience;
       Object.assign(S, opts);
       if (!ctx) return;
+      audioSession();
       applyMaster();
       if (!S.enabled || S.ambience === 'off' || S.ambience !== prevAmb) stopAmbience();
       if (S.enabled && unlocked) startAmbience();
@@ -6365,6 +6393,19 @@ table.score tr.total td {
     { key: 'casino', label: 'Ambiente visual', hint: 'Sala oscura con luces, lámpara sobre la mesa y fichas que vuelan.', options: [[true, 'Casino'], [false, 'Sencillo']] },
   ];
 
+  function renderAudioState() {
+    const el = $('audio-state');
+    if (!el) return;
+    const st = SFX.state;
+    el.textContent = !SFX.supported
+      ? 'Este navegador no permite sonido.'
+      : st === 'running'
+        ? settings.training.sound
+          ? 'Audio funcionando.'
+          : 'Audio listo, pero el sonido está en silencio.'
+        : 'Audio en pausa: toca «Probar sonido» para activarlo.';
+  }
+
   function buildSoundForm() {
     buildForm('sound-form', SOUND_FIELDS, settings.training, () => {
       applyAudio();
@@ -6385,6 +6426,28 @@ table.score tr.total td {
       h('div', { class: 'setting' }, h('div', null, h('span', null, 'Volumen')), h('label', { class: 'range' }, vol, out)),
       $('sound-form').children[1],
     );
+    const test = h(
+      'button',
+      {
+        class: 'btn small',
+        type: 'button',
+        onclick: () => {
+          if (!settings.training.sound) {
+            settings.training.sound = true;
+            applyAudio();
+          }
+          SFX.unlock();
+          setTimeout(() => {
+            SFX.chip(3);
+            setTimeout(() => SFX.win(), 250);
+            renderAudioState();
+          }, 120);
+        },
+      },
+      'Probar sonido',
+    );
+    $('sound-form').append(h('div', { class: 'setting' }, h('div', null, h('span', null, 'Prueba'), h('span', { class: 'hint', id: 'audio-state' }, '')), test));
+    renderAudioState();
   }
 
   const isStandalone = () =>
@@ -6587,14 +6650,13 @@ table.score tr.total td {
     // Sonido: se activa con el primer toque (regla de los navegadores).
     buildSoundForm();
     applyAudio();
+    // Se intenta en cada toque mientras el audio no funcione (el iPhone lo pausa al salir de la app).
     const unlock = () => {
+      if (SFX.state === 'running') return;
       SFX.unlock();
-      applyAudio();
-      document.removeEventListener('pointerdown', unlock, true);
-      document.removeEventListener('keydown', unlock, true);
+      setTimeout(renderAudioState, 150);
     };
-    document.addEventListener('pointerdown', unlock, true);
-    document.addEventListener('keydown', unlock, true);
+    for (const ev of ['touchend', 'click', 'pointerup', 'keydown']) document.addEventListener(ev, unlock, true);
     $('sound-btn').addEventListener('click', () => {
       settings.training.sound = !settings.training.sound;
       applyAudio();
