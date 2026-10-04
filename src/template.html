@@ -41,6 +41,18 @@
     </form>
   </dialog>
 
+  <dialog class="dialog" id="bots-dialog" aria-labelledby="bots-dlg-title">
+    <form method="dialog">
+      <h2 id="bots-dlg-title">Robots en la mesa</h2>
+      <p class="small muted">Juegan estrategia básica y sus cartas también cuentan para el conteo. El cambio se aplica en la próxima mano.</p>
+      <div class="seg" id="bots-seg" role="radiogroup" aria-label="Robots en la mesa"></div>
+      <div class="controls end">
+        <button class="btn ghost" type="submit" value="cancel">Cancelar</button>
+        <button class="btn primary" type="submit" value="ok">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="install-banner" id="update-banner" hidden>
     <div class="install-text"><b>Hay una versión nueva de Seis Mazos</b><span>Toca «Actualizar» cuando termines la mano.</span></div>
     <button class="btn small primary" type="button" id="update-btn">Actualizar</button>
@@ -97,8 +109,8 @@
             <div class="controls" id="controls"></div>
             <div class="table-opts" id="table-opts">
               <div class="table-opt" id="bots-opts">
-                <span>Jugadores robot en la mesa</span>
-                <div class="seg" id="bots-seg" role="radiogroup" aria-label="Jugadores robot en la mesa"></div>
+                <span id="bots-summary"></span>
+                <button class="btn small ghost" type="button" id="bots-change">Cambiar</button>
                 <span class="small muted" id="bots-note"></span>
               </div>
               <label class="check"><input type="checkbox" id="opt-totals" data-totals> Mostrar el total de cada mano</label>

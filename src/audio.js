@@ -263,51 +263,205 @@
     ambience = null;
   }
 
-  /* ---------- Música lounge generativa (piano eléctrico, contrabajo y escobillas) ---------- */
+  /* ---------- Música lounge generativa ----------
+   * Cambia sola cada minuto y medio aprox.: estilo (swing, bossa o balada), tonalidad, tempo,
+   * progresión de acordes y, a veces, una melodía de vibráfono que se inventa sobre la marcha.
+   * Entre una pieza y otra baja despacio y entra la siguiente.
+   */
   const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
-  const CHORDS = [
-    { root: 48, notes: [64, 67, 71, 74] }, // Cmaj9
-    { root: 45, notes: [60, 64, 67, 71] }, // Am9
-    { root: 50, notes: [65, 69, 72, 76] }, // Dm9
-    { root: 43, notes: [65, 69, 71, 76] }, // G13
-  ];
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  // Voces sin fundamental (la pone el contrabajo), en semitonos sobre la raíz del acorde.
+  const VOICING = {
+    maj9: [4, 7, 11, 14],
+    six9: [4, 9, 14, 19],
+    m9: [3, 7, 10, 14],
+    m7: [3, 7, 10, 15],
+    d13: [4, 10, 14, 21],
+    d9: [4, 7, 10, 14],
+    alt: [4, 10, 15, 20],
+    m7b5: [3, 6, 10, 15],
+  };
+  // Progresiones: [grado en semitonos sobre la tónica, tipo de acorde], un acorde por compás.
+  const P = {
+    lounge: [[0, 'maj9'], [9, 'm9'], [2, 'm9'], [7, 'd13']],
+    twoFive: [[2, 'm9'], [7, 'd13'], [0, 'maj9'], [9, 'alt']],
+    turnaround: [[0, 'six9'], [9, 'alt'], [2, 'm9'], [7, 'd13'], [4, 'm7'], [9, 'd13'], [2, 'm9'], [7, 'd13']],
+    blues: [[0, 'd13'], [5, 'd9'], [0, 'd13'], [0, 'd13'], [5, 'd9'], [5, 'd9'], [0, 'd13'], [9, 'alt'], [2, 'm9'], [7, 'd13'], [0, 'd13'], [7, 'alt']],
+    autumn: [[5, 'm7'], [10, 'd9'], [3, 'maj9'], [8, 'maj9'], [2, 'm7b5'], [7, 'alt'], [0, 'm9'], [0, 'm9']],
+    ipanema: [[0, 'maj9'], [0, 'maj9'], [2, 'd13'], [2, 'd13'], [2, 'm9'], [1, 'd9'], [0, 'six9'], [1, 'd9']],
+    minorBossa: [[0, 'm9'], [0, 'm9'], [5, 'm9'], [5, 'm9'], [2, 'm7b5'], [7, 'alt'], [0, 'm9'], [7, 'alt']],
+    float: [[0, 'maj9'], [0, 'maj9'], [10, 'maj9'], [10, 'maj9']],
+  };
+  const STYLES = {
+    swing: { bpm: [80, 96], bars: 32, swing: true, progs: [P.lounge, P.twoFive, P.turnaround, P.blues] },
+    bossa: { bpm: [120, 136], bars: 48, swing: false, progs: [P.ipanema, P.minorBossa, P.lounge, P.twoFive] },
+    ballad: { bpm: [60, 70], bars: 24, swing: false, progs: [P.float, P.autumn, P.lounge, P.twoFive] },
+  };
+  const KEYS = [0, 2, 3, 5, 7, 8, 10];
 
-  function ep(t, m, peak) {
-    const f = midi(m);
-    tone({ t, freq: f, d: 2.2, peak, dest: music, lp: 2200, a: 0.012 });
-    tone({ t, freq: f * 2, d: 0.6, peak: peak * 0.25, dest: music, a: 0.006 });
+  function planSection(prev) {
+    const names = Object.keys(STYLES).filter((s) => !prev || s !== prev.style);
+    const style = pick(names);
+    const st = STYLES[style];
+    let key = pick(KEYS);
+    while (prev && key === prev.key) key = pick(KEYS);
+    const prog = pick(st.progs);
+    return {
+      style,
+      key,
+      prog,
+      bars: prog.length * Math.max(1, Math.round(st.bars / prog.length)),
+      bpm: Math.round(rand(st.bpm[0], st.bpm[1])),
+      swing: st.swing,
+      melody: Math.random() < 0.75,
+      rhythm: null,
+      last: 76,
+      comp: [0, 3],
+      dest: null,
+    };
   }
 
+  function voicing(pc, type) {
+    const notes = VOICING[type].map((i) => 48 + pc + i);
+    while (Math.min(...notes) < 55) notes.forEach((n, i) => (notes[i] = n + 12));
+    while (Math.min(...notes) >= 67) notes.forEach((n, i) => (notes[i] = n - 12));
+    return notes;
+  }
+
+  // Piano eléctrico.
+  function ep(t, m, peak, dest, d) {
+    const f = midi(m);
+    tone({ t, freq: f, d: d || 2.2, peak, dest, lp: 2200, a: 0.012 });
+    tone({ t, freq: f * 2, d: 0.6, peak: peak * 0.25, dest, a: 0.006 });
+  }
+  function chordHit(t, notes, peak, dest, d, roll) {
+    notes.forEach((n, i) => ep(t + i * (roll || 0.008) + rand(0, 0.006), n, peak * rand(0.85, 1.1), dest, d));
+  }
+  // Contrabajo.
+  function bass(t, pc, d, dest, peak) {
+    let m = 40 + (((pc % 12) + 12) % 12);
+    if (m > 50) m -= 12;
+    tone({ t, freq: midi(m), type: 'triangle', lp: 520, d, peak: peak || 0.16, dest });
+  }
+  // Vibráfono.
+  function vibe(t, m, peak, dest) {
+    const f = midi(m);
+    tone({ t, freq: f, d: 1.5, peak, dest, a: 0.004 });
+    tone({ t, freq: f * 4, d: 0.2, peak: peak * 0.16, dest, a: 0.002 });
+  }
+
+  // Melodía: frases de dos compases y dos de silencio; el ritmo se repite para que tenga forma.
+  function melody(sec, bar, i, t, pc, type) {
+    if (!sec.melody || bar < 4) return;
+    const phraseBar = bar % 4;
+    if (phraseBar >= 2) return;
+    if (bar % 4 === 0 && i === 0 && (!sec.rhythm || Math.random() < 0.35)) {
+      const dense = sec.style === 'ballad' ? 4 : 6;
+      const slots = [];
+      for (let s = 0; s < 16; s++) if (Math.random() < (s % 2 === 0 ? 0.45 : 0.25) * (dense / 6)) slots.push(s);
+      sec.rhythm = slots.length ? slots : [0, 3, 8];
+    }
+    const s = phraseBar * 8 + i;
+    if (!sec.rhythm.includes(s)) return;
+    const chordTones = VOICING[type].map((x) => (pc + x) % 12).concat([pc % 12]);
+    const scale = [0, 2, 4, 7, 9].map((x) => (sec.key + x) % 12);
+    const pool = i % 2 === 0 ? chordTones : chordTones.concat(scale);
+    const cands = [];
+    for (let m = 70; m <= 86; m++) if (pool.includes(m % 12)) cands.push(m);
+    const near = cands.filter((m) => Math.abs(m - sec.last) <= 5 && m !== sec.last);
+    const m = pick(near.length ? near : cands);
+    sec.last = m;
+    vibe(t, m, sec.style === 'bossa' ? 0.03 : 0.04, sec.dest);
+  }
+
+  function playStep(sec, k, t0, e) {
+    const bar = Math.floor(k / 8);
+    const i = k % 8;
+    const d = sec.dest;
+    const [deg, type] = sec.prog[bar % sec.prog.length];
+    const [ndeg] = sec.prog[(bar + 1) % sec.prog.length];
+    const pc = (sec.key + deg) % 12;
+    const npc = (sec.key + ndeg) % 12;
+    const t = t0 + (sec.swing && i % 2 === 1 ? e / 3 : 0) + rand(0, 0.006);
+    const notes = voicing(pc, type);
+    const third = type[0] === 'm' ? 3 : 4;
+    const fifth = type === 'm7b5' ? 6 : 7;
+    // Último compás: acorde de la tónica que se queda sonando mientras baja el volumen.
+    if (bar === sec.bars - 1) {
+      if (i === 0) {
+        const [d0, t0type] = sec.prog[0];
+        const tonic = (sec.key + d0) % 12;
+        chordHit(t, voicing(tonic, t0type), 0.04, d, 4, 0.05);
+        bass(t, tonic, 3, d);
+      }
+      return;
+    }
+    if (sec.style === 'swing') {
+      if (i === 0) sec.comp = pick([[0, 3], [1, 4], [0, 5], [3, 6], [2, 5, 7], [0, 3, 6]]);
+      if (sec.comp.includes(i)) chordHit(t, notes, i === 0 ? 0.042 : 0.032, d, 1.6);
+      if (i % 2 === 0) {
+        const q = i / 2;
+        const approach = (npc - pc + 12 + (Math.random() < 0.5 ? 1 : -1)) % 12;
+        const walk = [0, pick([third, fifth]), pick([fifth, 9, 12]), approach];
+        bass(t, pc + walk[q], 0.42, d);
+      }
+      if (i % 2 === 0 || i === 3 || i === 7) burst({ t, dur: 0.14, freq: 8500, type: 'highpass', q: 0.5, peak: 0.016, dest: d });
+      if (i === 2 || i === 6) burst({ t, dur: 0.05, freq: 7000, q: 1.5, peak: 0.018, dest: d });
+    } else if (sec.style === 'bossa') {
+      const s = (bar % 2) * 8 + i;
+      if ([0, 3, 6, 10, 12].includes(s)) chordHit(t, notes, s === 0 ? 0.036 : 0.028, d, 0.55);
+      if (i === 0) bass(t, pc, 0.5, d);
+      if (i === 3) bass(t, pc + fifth, 0.2, d, 0.12);
+      if (i === 4) bass(t, pc + fifth, 0.6, d);
+      if ([0, 3, 6, 10, 13].includes(s)) burst({ t, dur: 0.03, freq: 1900, q: 4, peak: 0.03, dest: d });
+      burst({ t, dur: 0.05, freq: 9000, type: 'highpass', q: 0.6, peak: i % 2 ? 0.012 : 0.007, dest: d });
+    } else {
+      if (i === 0) {
+        chordHit(t, notes, 0.034, d, 3.2, 0.06);
+        bass(t, pc, 2.6, d, 0.13);
+        if (bar % 4 === 0) burst({ t, dur: 2.4, a: 1.2, freq: 7000, type: 'highpass', q: 0.4, peak: 0.01, dest: d });
+      } else if (i >= 2 && Math.random() < 0.55) {
+        const up = bar % 2 === 0;
+        ep(t, notes[(up ? i : 9 - i) % notes.length] + 12, 0.016, d, 1.4);
+      }
+      if (i === 4 && Math.random() < 0.5) bass(t, pc + fifth, 1.2, d, 0.1);
+    }
+    melody(sec, bar, i, t, pc, type);
+  }
+
+  let playing = null; // qué suena ahora (para mostrarlo en Reglas)
   function startMusic() {
-    const beat = 60 / 82;
-    let step = 0; // corcheas
-    let next = now() + 0.1;
+    let sec = null;
+    let k = 0;
+    let next = 0;
+    const begin = (t) => {
+      sec = planSection(sec);
+      sec.dest = ctx.createGain();
+      sec.dest.gain.setValueAtTime(0.0001, t);
+      sec.dest.gain.exponentialRampToValueAtTime(1, t + 2.5);
+      sec.dest.connect(music);
+      playing = { style: sec.style, key: sec.key, bpm: sec.bpm, bars: sec.bars, seconds: Math.round((sec.bars * 8 * 30) / sec.bpm) };
+      k = 0;
+      next = t;
+    };
     return setInterval(() => {
       if (!ready()) {
-        next = now() + 0.1;
+        if (sec) next = now() + 0.1;
         return;
       }
-      while (next < now() + 0.25) {
-        const bar = Math.floor(step / 8);
-        const inBar = step % 8;
-        const chord = CHORDS[Math.floor(bar / 2) % CHORDS.length];
-        const nextChord = CHORDS[(Math.floor(bar / 2) + 1) % CHORDS.length];
-        const swing = inBar % 2 === 1 ? beat / 6 : 0;
-        const t = next + swing;
-        // piano: golpe en 1 y en el "y" del 2
-        if (inBar === 0 || inBar === 3) for (const n of chord.notes) ep(t, n, inBar === 0 ? 0.045 : 0.032);
-        // contrabajo caminando en negras
-        if (inBar % 2 === 0) {
-          const q = inBar / 2;
-          const last = bar % 2 === 1 && q === 3;
-          const m = last ? nextChord.root - 1 : chord.root + [0, 7, 12, 7][q] - (q === 2 ? 12 : 0);
-          tone({ t, freq: midi(m), type: 'triangle', lp: 520, d: 0.42, peak: 0.16, dest: music });
+      if (!sec) begin(now() + 0.1);
+      while (next < now() + 0.3) {
+        const e = 60 / sec.bpm / 2;
+        if (Math.floor(k / 8) >= sec.bars) {
+          const old = sec.dest;
+          old.gain.setTargetAtTime(0.0001, next, 0.5);
+          setTimeout(() => old.disconnect(), (next - now() + 5) * 1000);
+          begin(next + 1.2);
+          continue;
         }
-        // platillo con escobillas
-        if (inBar % 2 === 0 || inBar === 3 || inBar === 7) burst({ t, dur: 0.14, freq: 8500, type: 'highpass', q: 0.5, peak: 0.018, dest: music });
-        if (inBar === 2 || inBar === 6) burst({ t, dur: 0.05, freq: 7000, q: 1.5, peak: 0.02, dest: music });
-        step++;
-        next += beat / 2;
+        playStep(sec, k, next, e);
+        k++;
+        next += e;
       }
     }, 60);
   }
@@ -439,6 +593,9 @@
       }, () => {});
     },
     say,
+    get nowPlaying() {
+      return ambience && ambience.music ? playing : null;
+    },
     voices: () => spanishVoices().map((v) => ({ id: voiceId(v), name: v.name, lang: v.lang })),
     get voiceName() {
       const v = pickVoice();

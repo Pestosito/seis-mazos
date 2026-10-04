@@ -704,6 +704,17 @@ kbd {
   font-size: 0.66rem;
   font-weight: 700;
 }
+.spot .chip.paid {
+  position: absolute;
+  transform: translate(46%, -40%);
+  animation: paid-in 320ms ease-out 480ms both;
+}
+@keyframes paid-in {
+  from {
+    opacity: 0;
+    transform: translate(46%, -90%) scale(0.8);
+  }
+}
 .seat:not(.you) .chip {
   width: 24px;
   font-size: 0.55rem;
@@ -1900,7 +1911,8 @@ table.score tr.total td {
   .card.flip,
   .flash-fb.pop,
   td.h17diff.pulse,
-  .hand.won {
+  .hand.won,
+  .spot .chip.paid {
     animation: none;
   }
   :root.casino body::before {

@@ -2,17 +2,22 @@
 //   app/                 → app instalable (PWA) lista para publicar en Netlify u otro hosting
 //   dist/index.html      → fragmento para publicar como Artifact de Claude (solo modo individual)
 //   dist/blackjack.html  → documento único para abrir directamente en el navegador
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const url = (p) => new URL(p, import.meta.url);
 const read = (p) => readFileSync(url(p), 'utf8');
 
+// Tipografías guardadas dentro de la app instalable (sin internet no se puede pedir a Google Fonts).
+const fontFiles = readdirSync(url('./src/fonts/')).filter((f) => /\.(woff2|css|txt)$/.test(f)).sort();
+
 // Versión: huella de las fuentes; se muestra en Reglas → Mantenimiento y nombra la caché.
-const version = createHash('sha256')
-  .update(['template.html', 'styles.css', 'audio.js', 'engine.js', 'explain.js', 'app.js', 'sw.js', 'vendor/mqtt.min.js'].map((f) => read('./src/' + f)).join('\n'))
-  .digest('hex')
-  .slice(0, 8);
+const hash = createHash('sha256').update(
+  ['template.html', 'styles.css', 'audio.js', 'engine.js', 'explain.js', 'app.js', 'sw.js', 'vendor/mqtt.min.js'].map((f) => read('./src/' + f)).join('\n'),
+);
+for (const f of fontFiles) hash.update(readFileSync(url('./src/fonts/' + f)));
+const version = hash.digest('hex').slice(0, 8);
+const GOOGLE_FONTS = /<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\n<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\n<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]*">/;
 
 function page({ head = '', vendor = '' } = {}) {
   return read('./src/template.html')
@@ -59,11 +64,21 @@ const pwaHead = `<meta name="description" content="Practica blackjack: estrategi
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Seis Mazos">
 <script>window.SEIS_MAZOS_PWA = true;</script>`;
-const appHtml = doc(page({ head: pwaHead, vendor: '<script src="mqtt.min.js"></script>' }));
+const pwaPage = page({ head: pwaHead, vendor: '<script src="mqtt.min.js"></script>' });
+if (!GOOGLE_FONTS.test(pwaPage)) throw new Error('No encontré los enlaces de Google Fonts en template.html');
+const appHtml = doc(pwaPage.replace(GOOGLE_FONTS, '<link rel="stylesheet" href="fonts/fonts.css">'));
 rmSync(url('./app/'), { recursive: true, force: true });
 mkdirSync(url('./app/icons/'), { recursive: true });
+mkdirSync(url('./app/fonts/'), { recursive: true });
 writeFileSync(url('./app/index.html'), appHtml);
-writeFileSync(url('./app/sw.js'), read('./src/sw.js').replace('__VERSION__', version));
+for (const f of fontFiles) copyFileSync(url('./src/fonts/' + f), url('./app/fonts/' + f));
+const fontAssets = fontFiles.filter((f) => !f.endsWith('.txt')).map((f) => `'fonts/${f}'`);
+writeFileSync(
+  url('./app/sw.js'),
+  read('./src/sw.js')
+    .replace('__VERSION__', version)
+    .replace('/*__FONT_FILES__*/', () => fontAssets.join(',\n  ')),
+);
 copyFileSync(url('./src/manifest.webmanifest'), url('./app/manifest.webmanifest'));
 copyFileSync(url('./src/vendor/mqtt.min.js'), url('./app/mqtt.min.js'));
 copyFileSync(url('./src/vendor/MQTTJS-LICENSE.md'), url('./app/MQTTJS-LICENSE.md'));

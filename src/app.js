@@ -648,11 +648,12 @@
       const total = h('span', { class: 'pill' });
       const res = h('span', { class: 'pill' });
       const chip = h('div', { class: 'chip' });
+      const paid = h('div', { class: 'chip paid', hidden: true });
       const amt = h('span', { class: 'amt' });
-      const spot = h('div', { class: 'spot' }, chip, amt);
+      const spot = h('div', { class: 'spot' }, chip, paid, amt);
       const meta = h('div', { class: 'hand-meta' }, total, res);
       const root = h('div', { class: 'hand' }, cards, meta, spot);
-      n = { root, cards, total, res, chip, amt };
+      n = { root, cards, total, res, chip, paid, amt };
       handNodes.set(hv.id, n);
     }
     syncCards(n.cards, hv.cards);
@@ -673,10 +674,18 @@
       n.res.className = 'pill res-' + r.result;
       n.res.textContent = seat.pid && r.net ? `${RESULT_TEXT[r.result]} ${signedMoney(r.net)}` : RESULT_TEXT[r.result];
     } else n.res.hidden = true;
-    n.chip.hidden = !hv.bet;
-    n.chip.dataset.v = chipValue(hv.bet);
-    n.chip.textContent = hv.doubled ? '×2' : '';
-    n.amt.textContent = hv.bet ? money(hv.bet) : '';
+    // Lo que queda en el círculo: si pierdes, el crupier se lleva la apuesta; si te rindes,
+    // te devuelve la mitad; si ganas, paga a un lado de tu apuesta.
+    const r = hv.result;
+    const lost = r && (r.result === 'lose' || r.result === 'bust');
+    const left = !hv.bet || lost ? 0 : r && r.result === 'surrender' ? hv.bet / 2 : hv.bet;
+    const won = r && r.net > 0 ? r.net : 0;
+    n.chip.hidden = !left;
+    n.chip.dataset.v = chipValue(left);
+    n.chip.textContent = hv.doubled && !r ? '×2' : '';
+    n.paid.hidden = !won;
+    n.paid.dataset.v = chipValue(won);
+    n.amt.textContent = left || won ? money(left + won) : '';
     return n.root;
   }
 
@@ -2070,6 +2079,17 @@
       return;
     }
     const status = NET.status ? h('p', { class: 'net-status small' }, NET.status) : null;
+    if (NET.role === 'solo' && navigator.onLine === false) {
+      fill(
+        box,
+        h(
+          'p',
+          { class: 'small muted' },
+          'Sin internet. Todo lo demás funciona igual (mesa con robots, ejercicios, tablas); para jugar con otra persona hace falta conexión en los dos teléfonos.',
+        ),
+      );
+      return;
+    }
     if (NET.role === 'solo') {
       const modeBox = h('div', { class: 'seg', id: 'net-mode', role: 'radiogroup', 'aria-label': 'Modo' });
       const code = h('input', {
@@ -2997,21 +3017,39 @@
   ];
 
   // Selector rápido de robots bajo la mesa (el mismo ajuste que "Otros jugadores" en Reglas).
+  // Los robots se cambian en un cuadro aparte (con Guardar) para no tocarlos sin querer al apostar.
   function renderBotsPicker() {
     const guest = NET.role === 'guest';
     $('bots-opts').hidden = guest;
     $('opt-totals').checked = settings.training.showTotals;
     if (guest) return;
-    seg('bots-seg', 'bots-seg', [[0, 'Ninguno'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], settings.training.bots, (v) => {
-      settings.training.bots = v;
-      seg(`f-bots`, `f-bots`, TRAIN_FIELDS.find((f) => f.key === 'bots').options, v, (x) => {
-        settings.training.bots = x;
-        onTrainChange('bots');
-      });
-      onTrainChange('bots');
-    });
-    const applied = T.seats.filter((st) => !st.pid).length === Math.max(0, Math.min(settings.training.bots, 7 - T.seats.filter((st) => st.pid).length));
-    $('bots-note').textContent = applied ? 'Juegan estrategia básica; sus cartas también cuentan.' : 'Se aplica en la próxima mano.';
+    const n = settings.training.bots;
+    const names = BOT_NAMES.slice(0, n);
+    $('bots-summary').textContent = n
+      ? `Robots en la mesa: ${names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names[n - 1] : names[0]}`
+      : 'Sin robots: solo tú y el crupier';
+    const applied = T.seats.filter((st) => !st.pid).length === Math.max(0, Math.min(n, 7 - T.seats.filter((st) => st.pid).length));
+    $('bots-note').textContent = applied ? '' : 'Se aplica en la próxima mano.';
+  }
+  function setBots(v) {
+    settings.training.bots = v;
+    seg('f-bots', 'f-bots', TRAIN_FIELDS.find((f) => f.key === 'bots').options, v, (x) => setBots(x));
+    onTrainChange('bots');
+  }
+  function openBotsDialog() {
+    const dlg = $('bots-dialog');
+    let pick = settings.training.bots;
+    seg('bots-seg', 'bots-seg', [[0, 'Ninguno'], [1, '1'], [2, '2'], [3, '3'], [4, '4']], pick, (v) => (pick = v));
+    if (!dlg || typeof dlg.showModal !== 'function') {
+      const v = window.prompt('¿Cuántos robots? (0 a 4)', String(pick));
+      if (v != null && /^[0-4]$/.test(v.trim())) setBots(Number(v));
+      return;
+    }
+    dlg.returnValue = '';
+    dlg.onclose = () => {
+      if (dlg.returnValue === 'ok' && pick !== settings.training.bots) setBots(pick);
+    };
+    dlg.showModal();
   }
 
   function buildForm(boxId, fields, target, onChange) {
@@ -3190,7 +3228,7 @@
     {
       key: 'ambience',
       label: 'Ambiente de sala',
-      hint: 'Murmullo suave de la sala; con música lounge si quieres.',
+      hint: 'Murmullo suave de la sala; la música va cambiando sola entre swing, bossa y balada, en distintos tonos y tempos.',
       options: [['off', 'Apagado'], ['room', 'Murmullo'], ['music', 'Murmullo y música']],
     },
     { key: 'voice', label: 'Voz del crupier', hint: 'Pocas frases, despacio: «Blackjack», «¿Desea seguro?» y «Barajamos».', options: [[false, 'No'], [true, 'Sí']] },
@@ -3314,6 +3352,10 @@
     if (!window.SEIS_MAZOS_PWA) return;
     const standalone = isStandalone();
     $('install-panel').hidden = standalone;
+    // Que el teléfono no borre la app guardada para usarla sin internet.
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    window.addEventListener('online', renderOnline);
+    window.addEventListener('offline', renderOnline);
     if ('serviceWorker' in navigator) {
       const hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker
@@ -3458,6 +3500,7 @@
       showTab('mesa');
     });
     $('bank-btn').addEventListener('click', openBankDialog);
+    $('bots-change').addEventListener('click', openBotsDialog);
     $('btn-bank-edit').addEventListener('click', openBankDialog);
     twoStep($('btn-bank'), 'Reiniciar banca', () => {
       state.bankroll = START_BANK;
